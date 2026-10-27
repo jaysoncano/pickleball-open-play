@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canInvite,
   canManage,
   GroupNameSchema,
   logoUrl,
@@ -27,6 +28,25 @@ describe("canManage", () => {
   it("refuses without an account or an open play", () => {
     expect(canManage(null, play)).toBe(false);
     expect(canManage({ id: "a", role: "admin" }, null)).toBe(false);
+  });
+});
+
+describe("canInvite", () => {
+  const play = { createdBy: "h1", hostIds: ["h2"] };
+
+  it("lets only the main host and admins choose who hosts", () => {
+    expect(canInvite({ id: "h1", role: "host" }, play)).toBe(true);
+    expect(canInvite({ id: "a", role: "admin" }, play)).toBe(true);
+    expect(canInvite({ id: "h2", role: "host" }, play)).toBe(false);
+    expect(canInvite({ id: "h3", role: "host" }, play)).toBe(false);
+  });
+
+  it("refuses without an account or an open play", () => {
+    expect(canInvite(null, play)).toBe(false);
+    expect(canInvite({ id: "a", role: "admin" }, null)).toBe(false);
+    expect(
+      canInvite({ id: "h1", role: "host" }, { createdBy: null, hostIds: [] }),
+    ).toBe(false);
   });
 });
 

@@ -31,7 +31,7 @@ export function Field({
   );
 }
 
-/** Staff: schedule an open play at a venue for a level range. */
+/** Staff: schedule an open play; saving opens its Manage page. */
 export function CreateOpenPlay({
   feeCents,
   venues,
@@ -48,145 +48,49 @@ export function CreateOpenPlay({
     createOpenPlay,
     { error: null },
   );
-  const [levels, setLevels] = useState<Level[]>([LEVELS[0]]);
-  const [open, setOpen] = useState(false);
-
-  if (!open) {
-    return (
-      <Button size="lg" onClick={() => setOpen(true)} className="self-start">
-        <span aria-hidden>＋</span> New open play
-      </Button>
-    );
-  }
-
   return (
     <section
       aria-labelledby="create-title"
-      className="w-full rounded-[2rem] bg-white/80 p-4 ring-2 ring-white backdrop-blur sm:p-5"
+      className="w-full rounded-[2rem] bg-white/80 p-4 ring-2 ring-white backdrop-blur sm:p-6"
     >
-      <h2 id="create-title" className="mb-3 font-display text-2xl font-bold">
-        <span aria-hidden>🗓️</span> New open play
+      <h2 id="create-title" className="sr-only">
+        Open play details
       </h2>
-      {/* Remount after each save so the next one starts fresh. */}
-      <form
-        key={String(state.ok && !pending)}
-        action={action}
-        className="flex flex-col gap-4"
-      >
+      <form action={action} className="flex flex-col gap-4">
         <BannerField play={NEW_PLAY} />
         <VenueFields venues={venues} />
         <GroupFields group={group} />
 
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="Date">
-            <input
-              name="playDate"
-              type="date"
-              required
-              defaultValue={now ? dateInput(now) : undefined}
-              className={INPUT}
-            />
-          </Field>
-          <Field label="Starts">
-            <input
-              name="startTime"
-              type="time"
-              required
-              defaultValue="18:00"
-              className={INPUT}
-            />
-          </Field>
-          <Field label="Ends">
-            <input
-              name="endTime"
-              type="time"
-              required
-              defaultValue="20:00"
-              className={INPUT}
-            />
-          </Field>
-        </div>
-
-        <fieldset className="rounded-2xl bg-fuchsia-50 p-3 ring-2 ring-fuchsia-100">
-          <legend className="px-1 font-display font-semibold text-fuchsia-900">
-            Ranks in this open play
-          </legend>
-          <div className="flex flex-wrap gap-2">
-            {LEVELS.map((l) => {
-              const on = levels.includes(l);
-              return (
-                <label
-                  key={l}
-                  className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-full py-1 pr-4 pl-2 font-semibold ring-2 transition-colors ${on ? `${LEVEL_INFO[l].tone} ring-fuchsia-400` : "bg-white text-ink/60 ring-ink/10 hover:ring-fuchsia-200"}`}
-                >
-                  <input
-                    type="checkbox"
-                    name="levels"
-                    value={l}
-                    checked={on}
-                    onChange={() =>
-                      setLevels((ls) =>
-                        on ? ls.filter((x) => x !== l) : [...ls, l],
-                      )
-                    }
-                    className="size-5 accent-fuchsia-500"
-                  />
-                  {LEVEL_INFO[l].label}
-                </label>
-              );
-            })}
-          </div>
-          <p className="mt-2 text-sm font-semibold text-fuchsia-900/80">
-            {levels.length
-              ? `${ranksLabel({ levels: LEVELS.filter((l) => levels.includes(l)) })}: each rank gets its own queue, and you choose which rank plays on each court.`
-              : "Tick at least one rank."}
-          </p>
-        </fieldset>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Max pairs (optional)">
-            <input
-              name="maxPairs"
-              type="number"
-              inputMode="numeric"
-              min={2}
-              max={MAX_PAIRS}
-              placeholder="No limit"
-              className={INPUT}
-            />
-          </Field>
-          <Field label="Entry per pair">
-            <input
-              name="fee"
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step="0.01"
-              required
-              defaultValue={feeCents / 100}
-              className={INPUT}
-            />
-          </Field>
-        </div>
+        {/* Remount once the clock is known, so the date starts on today. */}
+        <ScheduleFields
+          key={now ? "today" : "pending"}
+          defaults={{
+            playDate: now ? dateInput(now) : undefined,
+            startTime: "18:00",
+            endTime: "20:00",
+            levels: [LEVELS[0]],
+            maxPairs: null,
+            fee: feeCents / 100,
+          }}
+        />
 
         {state.error && (
           <p role="alert" className="text-sm font-semibold text-rose-600">
             {state.error}
           </p>
         )}
-        {state.ok && !pending && (
-          <p role="status" className="text-sm font-semibold text-lime-700">
-            ✓ Open play scheduled. Add another, or close this form.
-          </p>
-        )}
-        <div className="flex flex-wrap gap-2">
-          <Button type="submit" disabled={pending}>
-            {pending ? "Saving…" : "Schedule open play"}
-          </Button>
-          <Button variant="ghost" onClick={() => setOpen(false)}>
-            Close
-          </Button>
-        </div>
+        <p className="text-sm text-ink/60">
+          Next you&apos;ll land on its Manage page to invite co-hosts and check
+          the details.
+        </p>
+        <Button
+          type="submit"
+          size="lg"
+          disabled={pending}
+          className="self-start"
+        >
+          {pending ? "Scheduling…" : "Schedule open play"}
+        </Button>
       </form>
     </section>
   );
@@ -316,5 +220,117 @@ function GroupFields({
         Change it any time in Settings.
       </p>
     </fieldset>
+  );
+}
+
+/** Starting values for the schedule fields. */
+export type ScheduleDefaults = {
+  playDate?: string;
+  startTime: string;
+  endTime: string;
+  levels: Level[];
+  maxPairs: number | null;
+  /** Whole currency units. */
+  fee: number;
+};
+
+/** Date and times, ranks, cap, and entry: scheduling and editing. */
+export function ScheduleFields({ defaults }: { defaults: ScheduleDefaults }) {
+  const [levels, setLevels] = useState<Level[]>(defaults.levels);
+  return (
+    <>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Field label="Date">
+          <input
+            name="playDate"
+            type="date"
+            required
+            defaultValue={defaults.playDate}
+            className={INPUT}
+          />
+        </Field>
+        <Field label="Starts">
+          <input
+            name="startTime"
+            type="time"
+            required
+            defaultValue={defaults.startTime}
+            className={INPUT}
+          />
+        </Field>
+        <Field label="Ends">
+          <input
+            name="endTime"
+            type="time"
+            required
+            defaultValue={defaults.endTime}
+            className={INPUT}
+          />
+        </Field>
+      </div>
+
+      <fieldset className="rounded-2xl bg-fuchsia-50 p-3 ring-2 ring-fuchsia-100">
+        <legend className="px-1 font-display font-semibold text-fuchsia-900">
+          Ranks in this open play
+        </legend>
+        <div className="flex flex-wrap gap-2">
+          {LEVELS.map((l) => {
+            const on = levels.includes(l);
+            return (
+              <label
+                key={l}
+                className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-full py-1 pr-4 pl-2 font-semibold ring-2 transition-colors ${on ? `${LEVEL_INFO[l].tone} ring-fuchsia-400` : "bg-white text-ink/60 ring-ink/10 hover:ring-fuchsia-200"}`}
+              >
+                <input
+                  type="checkbox"
+                  name="levels"
+                  value={l}
+                  checked={on}
+                  onChange={() =>
+                    setLevels((ls) =>
+                      on ? ls.filter((x) => x !== l) : [...ls, l],
+                    )
+                  }
+                  className="size-5 accent-fuchsia-500"
+                />
+                {LEVEL_INFO[l].label}
+              </label>
+            );
+          })}
+        </div>
+        <p className="mt-2 text-sm font-semibold text-fuchsia-900/80">
+          {levels.length
+            ? `${ranksLabel({ levels: LEVELS.filter((l) => levels.includes(l)) })}: each rank gets its own queue, and you choose which rank plays on each court.`
+            : "Tick at least one rank."}
+        </p>
+      </fieldset>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Max pairs (optional)">
+          <input
+            name="maxPairs"
+            type="number"
+            inputMode="numeric"
+            min={2}
+            max={MAX_PAIRS}
+            placeholder="No limit"
+            defaultValue={defaults.maxPairs ?? undefined}
+            className={INPUT}
+          />
+        </Field>
+        <Field label="Entry per pair">
+          <input
+            name="fee"
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step="0.01"
+            required
+            defaultValue={defaults.fee}
+            className={INPUT}
+          />
+        </Field>
+      </div>
+    </>
   );
 }

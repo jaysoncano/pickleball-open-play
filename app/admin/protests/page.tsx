@@ -7,7 +7,6 @@ import { LevelBadge } from "@/components/level-badge";
 import { Loading } from "@/components/loading";
 import { ProtestList } from "@/components/players/protest-list";
 import { RecordCard } from "@/components/players/record-card";
-import { Button } from "@/components/ui/button";
 import { isAdmin } from "@/lib/auth-server";
 import { getDb } from "@/lib/db/client";
 import {
@@ -19,6 +18,7 @@ import {
 } from "@/lib/db/queries";
 import { ranksLabel, whenLabel } from "@/lib/registration/open-play";
 import { playerGames, playerRecord } from "@/lib/ranking/record";
+import { ConfirmSubmit } from "@/components/ui/confirm-submit";
 
 export const metadata: Metadata = { title: "Protests" };
 
@@ -134,22 +134,22 @@ async function Protests() {
                     className="min-h-11 w-full rounded-2xl bg-sky-50 px-4 ring-2 ring-sky-100 outline-none focus:ring-sky-400"
                   />
                 </label>
-                <Button
-                  type="submit"
+                <ConfirmSubmit
+                  confirmLabel="Tap again to approve"
                   name="decision"
                   value="approve"
                   variant="lime"
                 >
                   ✓ Approve
-                </Button>
-                <Button
-                  type="submit"
+                </ConfirmSubmit>
+                <ConfirmSubmit
+                  confirmLabel="Tap again to reject"
                   name="decision"
                   value="reject"
                   variant="secondary"
                 >
                   Reject
-                </Button>
+                </ConfirmSubmit>
               </form>
             </li>
           ))}

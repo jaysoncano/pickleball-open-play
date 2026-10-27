@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { savePlayerLogin, type FormState } from "@/app/actions";
-import { Button } from "@/components/ui/button";
+import { ConfirmSubmit } from "@/components/ui/confirm-submit";
 
 const INPUT =
   "min-h-12 rounded-2xl bg-sky-50 px-4 text-base ring-2 ring-sky-100 outline-none focus:ring-sky-400";
@@ -80,9 +80,9 @@ export function LoginSettings({
           ✓ Saved. Sign in with your username and password next time.
         </p>
       )}
-      <Button type="submit" variant="secondary" disabled={pending}>
+      <ConfirmSubmit variant="secondary" disabled={pending}>
         {pending ? "Saving…" : "Save sign-in"}
-      </Button>
+      </ConfirmSubmit>
     </form>
   );
 }

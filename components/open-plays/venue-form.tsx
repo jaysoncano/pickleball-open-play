@@ -2,9 +2,9 @@
 
 import { useActionState } from "react";
 import { saveVenue, type FormState } from "@/app/actions";
-import { Button } from "@/components/ui/button";
 import type { Venue } from "@/lib/roles";
 import { VenueFields } from "./create-open-play";
+import { ConfirmSubmit } from "@/components/ui/confirm-submit";
 
 /** Its hosts: set or change the court venue and location. */
 export function VenueForm({
@@ -38,9 +38,13 @@ export function VenueForm({
           </p>
         )
       )}
-      <Button type="submit" disabled={pending} className="self-start">
+      <ConfirmSubmit
+        confirmLabel="Tap again to save venue"
+        disabled={pending}
+        className="self-start"
+      >
         {pending ? "Saving…" : "Save venue"}
-      </Button>
+      </ConfirmSubmit>
     </form>
   );
 }

@@ -77,8 +77,9 @@ Tailwind 4, Zod 4, and Drizzle ORM on Supabase Postgres.
 
 5. **Schedule your first open play**
 
-   On the home page, tap **New open play**: venue name and location are
-   required; banner, group name, and logo are optional.
+   Signing in opens **My open plays** (`/host`). Tap **New open play**
+   (`/open-plays/new`): venue name and location are required; banner,
+   group name, and logo are optional. Saving opens its Manage page.
 
 ## Local URLs
 
@@ -102,7 +103,7 @@ Tailwind 4, Zod 4, and Drizzle ORM on Supabase Postgres.
 | `npm run build`             | Production build                                                      |
 | `npm run db:generate`       | New migration after editing `lib/db/schema.ts`                        |
 | `npx supabase migration up` | Apply new migrations without restarting (`npm run dev` does this too) |
-| `npm run db:reset`          | Wipe local data and re-run all migrations                             |
+| `npm run db:reset`          | Wipe local data, re-run all migrations, load `supabase/seed.sql`      |
 | `npm run db:stop`           | Stop local Supabase                                                   |
 
 ## Troubleshooting
@@ -115,7 +116,7 @@ Tailwind 4, Zod 4, and Drizzle ORM on Supabase Postgres.
 - **No verification email** Locally, every email lands in Mailpit at
   http://127.0.0.1:54324.
 - **Locked out of staff** Run `npm run db:reset` (this deletes all local
-  data), then sign in with `admin` and `ADMIN_PASSWORD` again.
+  data and loads the sample data), then sign in as `admin` / `pop-admin-123`.
 
 ## Docs
 

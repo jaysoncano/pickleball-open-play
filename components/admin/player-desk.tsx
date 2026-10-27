@@ -122,11 +122,19 @@ export function PlayerDesk({
           <h2 id="pick-title" className="mb-3 font-display text-2xl font-bold">
             <span aria-hidden>🏅</span> Which open play?
           </h2>
+          {!admin && (
+            <p className="-mt-2 mb-3 text-sm text-ink/55">
+              Only the open plays you created or co-host. Their hosts are the
+              only ones who can register, take payments, and check in here.
+            </p>
+          )}
           {plays.length === 0 ? (
             <p className="rounded-3xl border-2 border-dashed border-ink/15 p-6 text-center text-ink/50">
-              No open plays on {date}.{" "}
+              {admin
+                ? `No open plays on ${date}.`
+                : `No open plays you host on ${date}.`}{" "}
               <Link
-                href="/"
+                href="/open-plays/new"
                 className="font-semibold text-fuchsia-600 underline"
               >
                 Schedule one

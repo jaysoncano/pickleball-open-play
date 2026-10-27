@@ -12,7 +12,8 @@ Tailwind 4, Zod 4, Drizzle ORM on Supabase Postgres (local via
 
 - `lib/queue/` — queue logic as pure functions (unchanged engine; players
   can carry DB ids via `PlayerEntry`). No React, no DB.
-- `lib/ranking/` — levels, score/protest Zod schemas, record math, ranking.
+- `lib/ranking/` — levels, score/protest Zod schemas, record math, ranking,
+  `standings.ts` (open play point system and predicted top N).
 - `lib/registration/` — pair/solo sign-up schemas, entry fee, pair level.
 - `lib/profile/` — basic-info/photo schemas, email codes, player cookie.
   `lib/email.ts` (send: Resend or Mailpit), `lib/email-templates.ts`
@@ -28,10 +29,13 @@ Tailwind 4, Zod 4, Drizzle ORM on Supabase Postgres (local via
 - `app/actions.ts` — every server action; each checks access (see Rules).
 - `components/session-provider.tsx` — live session state; `update()`
   applies an engine change, then saves in order in the background.
-- Pages: `/` (open plays: staff schedule theirs, public browses),
+- Pages: `/` (public: open plays coming up), `/host` (staff: My open
+  plays, live / coming up / past; admins Mine or All), `/open-plays/new`
+  (schedule one; saving opens its Manage page),
   `/open-plays/[id]` (its hosts: setup/dashboard; others: public board),
-  `/open-plays/[id]/hosts` (invite co-hosts by username or email),
-  `/open-plays/[id]/details` (venue + banner; image at `/banners/[id]`),
+  `/open-plays/[id]/manage` (its hosts: edit date/ranks/cap/fee, venue,
+  banner, hosts; only the main host invites; image at `/banners/[id]`;
+  old `/details` and `/hosts` redirect here),
   `/host/signup` + `/host/verify` (host self sign-up, email code),
   `/groups/[id]` (public group page) + `/groups/[id]/logo`, `/players`, `/players/[id]`,
   `/players/[id]/edit`, `/players/[id]/verify` (returning player → email code), `/claim/[token]` (QR → email code),
@@ -39,7 +43,7 @@ Tailwind 4, Zod 4, Drizzle ORM on Supabase Postgres (local via
   `/admin/qr-codes`, `/admin/players` (Player desk: pair sign-up, payment),
   `/admin/settings` (accounts and levels, password), `/login` (players).
   Host dashboard
-  tabs: Courts, Profiles (check-in QR), History.
+  tabs: Courts, Profiles (check-in QR), History, Standings.
 - Docs: `docs/prd/pop.md`, `docs/specs/data-model.md`,
   `docs/specs/queue-engine.md`.
 
@@ -51,7 +55,9 @@ Tailwind 4, Zod 4, Drizzle ORM on Supabase Postgres (local via
 - Schema change: edit `lib/db/schema.ts`, run `npm run db:generate`, then
   `npm run db:reset` locally. Keep `.enableRLS()` on every table.
 - Staff accounts are admins or hosts. Open-play-scoped actions check
-  `requireOpenPlay(id)` (admin, creator, or invited host); club-wide ones
+  `requireOpenPlay(id)` (admin, creator, or invited host); choosing hosts
+  (invite, remove) checks `requireMainHost(id)` (creator or admin, `canInvite`);
+  club-wide ones
   (protests, levels, QR codes page, accounts) check `requireAdmin()`.
   Lists for staff filter with `managedBy` unless an admin picks "All".
 - Every other server action that changes data checks `requireAdmin()`, except
@@ -75,11 +81,23 @@ Tailwind 4, Zod 4, Drizzle ORM on Supabase Postgres (local via
 - DB/cookie reads in pages go inside `<Suspense>` (Cache Components).
 - Engine functions take `now` and `rng` as arguments.
 - Destructive buttons use `ConfirmButton` (two taps), never `confirm()`.
+  Saves that change or replace data use `ConfirmSubmit` (two taps, checks
+  the form first); a dropdown or file pick that saves asks inline first.
+  Live dashboard moves (queue order, swaps, court rank, rename) stay one tap.
 
 ## Local email
 
 No `RESEND_API_KEY` locally: codes and receipts land in Mailpit at
 http://127.0.0.1:54324 (`MAILPIT_URL`), started by `npm run db:start`.
+
+## Sample data
+
+`supabase/seed.sql` loads on `npm run db:reset` (dates relative to
+today): accounts `admin` / `pop-admin-123`; hosts `makati.host`,
+`bgc.host`, `pending.host` (unverified) / `pop-host-123`; players
+`maria`, `juan` / `pop-player-123`. "Riverside Courts" (today) is already
+running with two games on court for hosts to score. Fixed ids per table prefix
+(`a…` admins, `b…` players, `c…` open plays). Update it with schema changes.
 
 ## Commands
 

@@ -27,6 +27,8 @@ protests their skill level.
   6-digit code is emailed → `/host/verify` → the account opens and signs
   in. Until verified the account can't sign in (signing in sends a new
   code). Signing up again with an unverified email replaces that account.
+  The password and confirm fields each have a **Show / Hide** button
+  (`components/ui/password-input.tsx`).
 - **Group (optional):** an account can have a group name and logo
   (JPEG/PNG/WebP up to 300 KB). Set them in the New open play form's
   "Hosted by" section (prefilled; a blank name keeps the current one) or
@@ -36,12 +38,12 @@ protests their skill level.
 - **Venue is required** (name and location) on new open plays. Open plays
   without one (made before venues existed) show "📍 Venue to be
   announced" to players, and staff get an amber 📍 Add venue button on the
-  card that opens `/open-plays/[id]/details` (`saveVenue`, its hosts only).
+  card that opens its Manage page (`saveVenue`, its hosts only).
   Cards show the venue in bold with the location under it.
 - **Banner:** each open play can have a banner photo (JPEG/PNG/WebP; the
   browser shrinks it to 1600 px wide and up to 600 KB). Add it in the New
-  open play form or later from the card's ✏️ Venue & banner button
-  (`/open-plays/[id]/details`, its hosts only; removing takes two taps).
+  open play form or later on its Manage page (its hosts only; removing
+  takes two taps).
   Without one, a colorful court placeholder shows (its colors stay the
   same per open play, with the venue name on it).
 - **Card and open play page header:** banner on top with the ranks and
@@ -54,16 +56,30 @@ protests their skill level.
   now, Coming up, and the 6 most recent past open plays, plus a Share
   button (share sheet or copy link). It lists only open plays the account
   scheduled, never its username or email. Staff reach theirs from "Your
-  public page" on the home page.
+  public page" on My open plays.
 - **Host workflow (admin-added):** an admin adds the host's account in Settings
   (level: Host) and shares the username and password → the host signs in
-  and schedules open plays, which only they (and admins) see under
-  "Mine" → on an open play card, **Hosts** → invite by **username or
-  email**. An existing (verified) account joins right away; an email
+  and schedules open plays, which only they (and admins) see on **My
+  open plays** → on an open play card, **⚙️ Manage** → Hosts → invite by
+  **username or email**. Only the **main host** (the account that
+  scheduled it) or an admin invites and removes hosts; co-hosts see the
+  list but not the invite form. An existing (verified) account joins right away; an email
   without one gets an invitation email linking to host sign-up with the
   email filled in, and is listed under "Waiting to sign up" (cancellable)
   until they verify, then the open play is on their list. Invited hosts can be removed; the creator
   always stays. Removing an account keeps its open plays.
+- **Manage page** (`/open-plays/[id]/manage`, its hosts and admins
+  only; anyone else is sent to the public page, signed-out visitors to
+  sign-in): banner header with paid / waiting / solo / spots-left counts,
+  your role (main host, co-host, admin), and buttons to the courts and the
+  Player desk. Sections: **Date, ranks & entry** (edit; `editOpenPlay` →
+  `updateOpenPlay`), Court venue, Banner, Hosts (and invites, main host
+  only), and Remove while nobody has signed up. Edits are refused when
+  they'd strand players: while it's running the date, time, and ranks are
+  locked (cap and entry can change); a rank with sign-ups stays; the cap
+  can't go under the paid pairs; and a new time can't clash with another
+  open play its players joined. Paid amounts don't change. The old
+  `/details` and `/hosts` links redirect here.
 - **Players / public:** no sign-in. See the live board, the players list,
   any profile, and can file a level protest.
 - **Player sign-in** (`/login`): **username and password**, or a 6-digit
@@ -73,9 +89,33 @@ protests their skill level.
 - **Player (verified):** scans their profile QR code, verifies their email
   with a 6-digit code, then edits their own basic info and photo.
 
+## Confirming changes
+
+Nothing that removes, deletes, or changes saved data happens on one tap.
+Remove, delete, reject, end, and cancel buttons take two taps ("Sure?").
+Save buttons on edit forms take two taps too: the first checks the form
+and turns the button red with "Tap again to …" and "This can't be
+undone."; it resets after 5 seconds or when you tap away. This covers the
+open play edit, venue, banner, level change, protest approve/reject,
+payment confirmation, pairing solos, profile and login settings, password
+and group settings, the session time, and recording a score. Changing an
+account's level asks inline ("Make … an Admin? Yes, change it / Cancel"),
+and a picked profile photo waits for **Save photo**. Live court moves
+(queue order, swaps, court rank, renames) stay one tap so games keep
+moving; they can be changed back.
+
 ## Open plays by rank
 
-- Staff **schedule open plays** on the home page (`/`): **venue name and
+- **Pages:** the home page (`/`) is public: Live now and Coming up, with
+  no forms or host buttons (signed-in staff get a **My open plays**
+  button). **My open plays** (`/host`, staff only, also in the nav;
+  signing in and verifying land here) lists the open plays they created
+  or co-host: Live now, Coming up, and the 12 most recent Past ones, each
+  card with Register pairs, ⚙️ Manage, and Remove (while empty). Admins
+  switch between Mine and All. **New open play** is its own page
+  (`/open-plays/new`); saving opens the new open play's Manage page, and
+  removing one from its Manage page goes back to My open plays.
+- Staff **schedule open plays** at `/open-plays/new`: **venue name and
   location**, date, start and end time, the **ranks** it runs (tick one or more levels, e.g.
   Beginner and Novice), an optional **max pairs**, and the entry per pair.
 - **Venue autocomplete:** venues saved with past open plays are
@@ -83,8 +123,11 @@ protests their skill level.
   plays' venues, an admin all). Picking a saved venue fills in its
   location; the form starts with the last venue used. Cards, the public
   open play page, the board heading, and receipt emails show the venue.
-- **Staff see only their open plays** on `/` and at the Player desk: the
-  ones they created or were invited to host. Admins can switch to
+- **Staff see only their open plays** on `/host` and at the Player desk: the
+  ones they created or were invited to host. Every desk action (register,
+  pair solos, confirm or remove payments, check in, profile status)
+  checks the account hosts that open play, so a host can't act on
+  another host's open play by its id. Admins can switch to
   **All**. Opening an open play you don't run shows its public page.
 - **One open play, several ranks, shared courts.** Each ticked rank has
   its own line in the queue; pairs only play pairs of their rank. When
@@ -164,8 +207,21 @@ protests their skill level.
 - Same live dashboard: courts, up next, queue, drag to reorder, swap,
   pause, overtime alerts, history tab. **Late arrivals**: pairs paid at the
   desk for this open play appear under the queue (refreshes every 20 s).
-- **Game done** asks for the **final score** (no ties; quick picks 11, 15,
-  21). Saving records the match with each player's current level.
+- **Game done** asks the host for the **final score** (no ties; quick
+  picks 11, 15, 21). Scores are entered by hand, only by the open play's
+  hosts (creator, co-hosts) or an admin; players and the public board
+  can't. Saving records the match with each player's current level.
+- **Standings** tab (hosts only): pairs ranked by a **point system**,
+  not only wins. Each scored game is worth 3 for a win, up to ±1 for the
+  margin (11–0 is +1), and ±0.5 per rank for beating a stronger pair or
+  losing to a weaker one. Pairs are ranked by points per game, counted as
+  if each had one extra average game, so one lucky win can't top the
+  list; ties go to wins, point difference, then points scored. Until
+  every pair in the session has a scored game it shows "Leaders so far"
+  and who's still waiting; then it becomes the **predicted top N**, with
+  the leader as the predicted winner. The host picks Top 3, 5 or 10 and
+  one rank or all ranks. It refreshes when a game is scored and every
+  20 s.
 - Pair names come from the players ("Ana & Ben"); rename players at the
   desk, not in the queue.
 - Changes save in the background; a red banner shows if a save fails.

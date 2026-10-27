@@ -7,6 +7,9 @@ const variants = {
   secondary:
     "bg-white text-ink ring-2 ring-ink/10 shadow-[0_4px_0_0_rgba(36,28,71,0.12)] hover:ring-ink/20 active:shadow-[0_1px_0_0_rgba(36,28,71,0.12)]",
   ghost: "text-ink/70 hover:bg-ink/5 hover:text-ink",
+  /** Armed confirm: the next tap can't be undone. */
+  danger:
+    "bg-rose-500 text-white shadow-[0_4px_0_0_#9f1239] hover:bg-rose-400 active:shadow-[0_1px_0_0_#9f1239]",
 } as const;
 
 const sizes = {

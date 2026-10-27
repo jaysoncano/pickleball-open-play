@@ -7,6 +7,7 @@ import { Modal } from "@/components/ui/modal";
 import type { Court, Player } from "@/lib/queue/schema";
 import { firstError } from "@/lib/queue/schema";
 import { MAX_SCORE, ScoreSchema, type Score } from "@/lib/ranking/forms";
+import { ConfirmSubmit } from "@/components/ui/confirm-submit";
 
 const QUICK = [11, 15, 21];
 
@@ -116,9 +117,13 @@ export function ScoreDialog({
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" variant="lime" disabled={!parsed.success}>
+          <ConfirmSubmit
+            confirmLabel="Tap again to record it"
+            variant="lime"
+            disabled={!parsed.success}
+          >
             Save result ✓
-          </Button>
+          </ConfirmSubmit>
         </div>
       </form>
     </Modal>

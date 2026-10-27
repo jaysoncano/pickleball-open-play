@@ -22,6 +22,7 @@ import {
 } from "@/lib/registration/forms";
 import { EntryFields, type Fee } from "./entry-fields";
 import { Done } from "./register-form";
+import { ConfirmSubmit } from "@/components/ui/confirm-submit";
 
 type Day = Awaited<ReturnType<typeof registrationsFor>>;
 
@@ -230,9 +231,12 @@ function PairUp({
           <input type="hidden" name="a_playerId" value={picked[0]} />
           <input type="hidden" name="b_playerId" value={picked[1]} />
           <EntryFields fee={fee} />
-          <Button type="submit" disabled={pending}>
+          <ConfirmSubmit
+            confirmLabel="Tap again to pair & record"
+            disabled={pending}
+          >
             {pending ? "Saving…" : "Pair up & record entry"}
-          </Button>
+          </ConfirmSubmit>
         </form>
       )}
       <div className="mt-2">
@@ -291,9 +295,13 @@ function PendingPair({
         <form action={action} className="flex flex-col gap-3">
           <input type="hidden" name="pairId" value={pair.id} />
           <EntryFields fee={fee} />
-          <Button type="submit" variant="lime" disabled={pending}>
+          <ConfirmSubmit
+            confirmLabel="Tap again to confirm payment"
+            variant="lime"
+            disabled={pending}
+          >
             {pending ? "Confirming…" : `✓ Paid · confirm ${names}`}
-          </Button>
+          </ConfirmSubmit>
         </form>
       )}
       <Done state={state} />

@@ -2,8 +2,8 @@
 
 import { useActionState } from "react";
 import { saveProfile, type FormState } from "@/app/actions";
-import { Button } from "@/components/ui/button";
 import { HAND_LABEL, HANDS, PROFILE_LIMITS } from "@/lib/profile/forms";
+import { ConfirmSubmit } from "@/components/ui/confirm-submit";
 
 const INPUT =
   "min-h-12 rounded-2xl bg-sky-50 px-4 text-base ring-2 ring-sky-100 outline-none focus:ring-sky-400 disabled:text-ink/50";
@@ -156,9 +156,9 @@ export function ProfileForm({
           ✓ Saved
         </p>
       )}
-      <Button type="submit" disabled={pending}>
+      <ConfirmSubmit disabled={pending}>
         {pending ? "Saving…" : "Save info"}
-      </Button>
+      </ConfirmSubmit>
     </form>
   );
 }

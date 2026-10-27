@@ -2,8 +2,8 @@
 
 import { useActionState } from "react";
 import { changeLevel, type FormState } from "@/app/actions";
-import { Button } from "@/components/ui/button";
 import { LEVEL_INFO, LEVELS, type Level } from "@/lib/ranking/levels";
+import { ConfirmSubmit } from "@/components/ui/confirm-submit";
 
 /** Admin-only: set a player's level directly. */
 export function ChangeLevelForm({
@@ -49,9 +49,13 @@ export function ChangeLevelForm({
           className="min-h-11 rounded-2xl bg-white px-3 ring-2 ring-violet-100 outline-none focus:ring-violet-400"
         />
       </label>
-      <Button type="submit" variant="secondary" disabled={pending}>
+      <ConfirmSubmit
+        confirmLabel="Tap again to change level"
+        variant="secondary"
+        disabled={pending}
+      >
         Save
-      </Button>
+      </ConfirmSubmit>
       {state.error && (
         <p role="alert" className="w-full text-sm font-semibold text-rose-600">
           {state.error}

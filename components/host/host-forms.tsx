@@ -8,6 +8,7 @@ import {
   type FormState,
 } from "@/app/actions";
 import { Button } from "@/components/ui/button";
+import { PasswordInput } from "@/components/ui/password-input";
 
 const INPUT =
   "min-h-12 rounded-2xl bg-sky-50 px-4 text-base ring-2 ring-sky-100 outline-none focus:ring-sky-400";
@@ -20,7 +21,11 @@ function Field({
   return (
     <label className="flex flex-col gap-1">
       <span className="text-sm font-bold text-ink/60">{label}</span>
-      <input required className={INPUT} {...input} />
+      {input.type === "password" ? (
+        <PasswordInput required className={INPUT} {...input} />
+      ) : (
+        <input required className={INPUT} {...input} />
+      )}
       {hint && <span className="text-xs text-ink/50">{hint}</span>}
     </label>
   );

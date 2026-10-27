@@ -26,6 +26,8 @@ export function PhotoForm({
     { error: null },
   );
   const [preview, setPreview] = useState<string | null>(null);
+  // A picked photo waits here until it's confirmed: it replaces the old one.
+  const [picked, setPicked] = useState<File | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const [removing, startRemove] = useTransition();
   const [, startUpload] = useTransition();
@@ -38,10 +40,7 @@ export function PhotoForm({
     try {
       const blob = await resize(file);
       setPreview(URL.createObjectURL(blob));
-      const form = new FormData();
-      form.set("playerId", playerId);
-      form.set("photo", new File([blob], "photo.webp", { type: blob.type }));
-      startUpload(() => upload(form));
+      setPicked(new File([blob], "photo.webp", { type: blob.type }));
     } catch (e) {
       setLocalError(
         e instanceof Error ? e.message : "Couldn't read that image",
@@ -49,6 +48,20 @@ export function PhotoForm({
     } finally {
       for (const el of [input.current, camera.current]) if (el) el.value = "";
     }
+  }
+
+  function save() {
+    if (!picked) return;
+    const form = new FormData();
+    form.set("playerId", playerId);
+    form.set("photo", picked);
+    setPicked(null);
+    startUpload(() => upload(form));
+  }
+
+  function discard() {
+    setPicked(null);
+    setPreview(null);
   }
 
   const error = localError ?? state.error;
@@ -92,6 +105,19 @@ export function PhotoForm({
           <span aria-hidden>🖼️</span>{" "}
           {uploading ? "Uploading…" : "Choose a photo"}
         </Button>
+        {picked && (
+          <span className="flex flex-wrap items-center gap-2 rounded-2xl bg-rose-50 p-2">
+            <span className="text-sm font-semibold text-rose-800">
+              {src ? "Replace the current photo?" : "Use this photo?"}
+            </span>
+            <Button variant="lime" onClick={save}>
+              ✓ Save photo
+            </Button>
+            <Button variant="ghost" onClick={discard}>
+              Cancel
+            </Button>
+          </span>
+        )}
         {src && !preview && (
           <ConfirmButton
             label="Remove photo"
@@ -108,7 +134,7 @@ export function PhotoForm({
             {error}
           </p>
         )}
-        {state.ok && !uploading && (
+        {state.ok && !uploading && !picked && (
           <p role="status" className="text-sm font-semibold text-lime-700">
             ✓ Photo saved
           </p>

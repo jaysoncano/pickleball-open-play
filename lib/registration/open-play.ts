@@ -13,39 +13,58 @@ import { MAX_FEE } from "./forms";
 
 export const MAX_PAIRS = 200;
 
-/** What the admin fills in to schedule an open play. */
-export const OpenPlaySchema = z
-  .object({
-    ...VenueSchema.shape,
-    playDate: SessionDateSchema,
-    ...ScheduleSchema.shape,
-    /** The ticked ranks; each gets its own line in the queue. */
-    levels: z
-      .array(LevelSchema)
-      .min(1, "Tick at least one rank")
-      .transform((ls) => LEVELS.filter((l) => ls.includes(l))),
-    maxPairs: z
-      .union([z.literal(""), z.coerce.number()])
-      .transform((v) => (v === "" ? null : v))
-      .pipe(
-        z
-          .int("Max pairs must be a whole number")
-          .min(2, "Allow at least 2 pairs (one court)")
-          .max(MAX_PAIRS, `Up to ${MAX_PAIRS} pairs`)
-          .nullable(),
-      )
-      .default(null),
-    fee: z.coerce
-      .number("Enter the entry fee")
-      .min(0, "Fee can't be negative")
-      .max(MAX_FEE, "That fee looks too high"),
-  })
-  .refine((o) => o.startTime !== o.endTime, {
+/** When, which ranks, how many pairs, and the entry: set and edited. */
+const scheduleFields = {
+  playDate: SessionDateSchema,
+  ...ScheduleSchema.shape,
+  /** The ticked ranks; each gets its own line in the queue. */
+  levels: z
+    .array(LevelSchema)
+    .min(1, "Tick at least one rank")
+    .transform((ls) => LEVELS.filter((l) => ls.includes(l))),
+  maxPairs: z
+    .union([z.literal(""), z.coerce.number()])
+    .transform((v) => (v === "" ? null : v))
+    .pipe(
+      z
+        .int("Max pairs must be a whole number")
+        .min(2, "Allow at least 2 pairs (one court)")
+        .max(MAX_PAIRS, `Up to ${MAX_PAIRS} pairs`)
+        .nullable(),
+    )
+    .default(null),
+  fee: z.coerce
+    .number("Enter the entry fee")
+    .min(0, "Fee can't be negative")
+    .max(MAX_FEE, "That fee looks too high"),
+};
+
+const differentTimes = {
+  check: (o: { startTime: string; endTime: string }) =>
+    o.startTime !== o.endTime,
+  error: {
     message: "End time must be different from start time",
     path: ["endTime"],
-  })
-  .transform(({ fee, ...o }) => ({ ...o, feeCents: Math.round(fee * 100) }));
+  },
+};
 
+function toCents<T extends { fee: number }>({ fee, ...o }: T) {
+  return { ...o, feeCents: Math.round(fee * 100) };
+}
+
+/** What the admin fills in to schedule an open play. */
+export const OpenPlaySchema = z
+  .object({ ...VenueSchema.shape, ...scheduleFields })
+  .refine(differentTimes.check, differentTimes.error)
+  .transform(toCents);
+
+/** Its hosts changing when it is, its ranks, cap, or entry. */
+export const OpenPlayEditSchema = z
+  .object(scheduleFields)
+  .refine(differentTimes.check, differentTimes.error)
+  .transform(toCents);
+
+export type OpenPlayEdit = z.infer<typeof OpenPlayEditSchema>;
 export type OpenPlayInput = z.infer<typeof OpenPlaySchema>;
 
 export type Ranks = { levels: Level[] };

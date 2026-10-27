@@ -2,12 +2,12 @@
 
 import { useActionState, useRef, useState, useTransition } from "react";
 import { saveOpenPlayBanner, type FormState } from "@/app/actions";
-import { Button } from "@/components/ui/button";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { resizeImage } from "@/components/ui/resize-image";
 import { BANNER } from "@/lib/banner";
 import type { OpenPlay } from "@/lib/db/queries";
 import { PlayBanner } from "./play-banner";
+import { ConfirmSubmit } from "@/components/ui/confirm-submit";
 
 type BannerPlay = Pick<OpenPlay, "id" | "bannerUpdatedAt" | "venue">;
 
@@ -106,9 +106,12 @@ export function BannerForm({ play }: { play: BannerPlay }) {
         )
       )}
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={pending}>
+        <ConfirmSubmit
+          confirmLabel="Tap again to replace banner"
+          disabled={pending}
+        >
           {pending && !removing ? "Saving…" : "Save banner"}
-        </Button>
+        </ConfirmSubmit>
         {play.bannerUpdatedAt && (
           <ConfirmButton
             label="Remove the banner"

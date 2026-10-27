@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Level } from "@/lib/ranking/levels";
 import {
   joinProblem,
+  OpenPlayEditSchema,
   OpenPlaySchema,
   overlaps,
   rankProblem,
@@ -56,6 +57,26 @@ describe("OpenPlaySchema", () => {
     expect(OpenPlaySchema.safeParse(input).error?.issues[0].message).toBe(
       message,
     );
+  });
+});
+
+describe("OpenPlayEditSchema", () => {
+  it("parses the schedule without the venue", () => {
+    expect(OpenPlayEditSchema.parse({ ...base, maxPairs: "8" })).toEqual({
+      playDate: "2026-10-27",
+      startTime: "18:00",
+      endTime: "20:00",
+      levels: ["beginner", "novice"],
+      maxPairs: 8,
+      feeCents: 30000,
+    });
+  });
+
+  it("checks the times like scheduling does", () => {
+    expect(
+      OpenPlayEditSchema.safeParse({ ...base, endTime: "18:00" }).error
+        ?.issues[0].message,
+    ).toBe("End time must be different from start time");
   });
 });
 

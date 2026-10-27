@@ -4,6 +4,7 @@ import {
   desc,
   eq,
   gte,
+  lt,
   inArray,
   isNull,
   ne,
@@ -38,6 +39,7 @@ import {
   type Level,
 } from "@/lib/ranking/levels";
 import type { RecordedMatch } from "@/lib/ranking/record";
+import type { UnitGame } from "@/lib/ranking/standings";
 import {
   joinProblem,
   overlaps,
@@ -45,6 +47,7 @@ import {
   soloProblem,
   strongest,
   type Member,
+  type OpenPlayEdit,
   type OpenPlayInput,
 } from "@/lib/registration/open-play";
 import {
@@ -617,7 +620,8 @@ const managedBy = (adminId: string) =>
   );
 
 /**
- * Open plays on one date, or from a date on, by date and start time.
+ * Open plays on one date, or from a date on, by date and start time
+ * (or before a date, newest first).
  * With `managedBy`, only the ones that account runs.
  */
 export async function listOpenPlays(
@@ -625,6 +629,8 @@ export async function listOpenPlays(
   filter: {
     playDate?: string;
     from?: string;
+    /** Only open plays before this date (past ones), newest first. */
+    before?: string;
     managedBy?: string;
     /** Only the open plays this account's group hosts (it scheduled). */
     hostedBy?: string;
@@ -637,11 +643,16 @@ export async function listOpenPlays(
       and(
         filter.playDate ? eq(openPlays.playDate, filter.playDate) : undefined,
         filter.from ? gte(openPlays.playDate, filter.from) : undefined,
+        filter.before ? lt(openPlays.playDate, filter.before) : undefined,
         filter.managedBy ? managedBy(filter.managedBy) : undefined,
         filter.hostedBy ? eq(openPlays.createdBy, filter.hostedBy) : undefined,
       ),
     )
-    .orderBy(asc(openPlays.playDate), asc(openPlays.startTime));
+    .orderBy(
+      ...(filter.before
+        ? [desc(openPlays.playDate), desc(openPlays.startTime)]
+        : [asc(openPlays.playDate), asc(openPlays.startTime)]),
+    );
 }
 
 /**
@@ -700,6 +711,89 @@ export async function removeOpenPlay(
     .limit(1);
   if (used || ran) return "Players signed up already; it can't be removed";
   await db.delete(openPlays).where(eq(openPlays.id, id));
+  return null;
+}
+
+/**
+ * Change an open play's date, time, ranks, cap, or entry. Returns why
+ * not, or null when saved. Nothing changes that would strand players: a
+ * running session keeps its date, time, and ranks; a rank stays while
+ * pairs or solos are in it; the cap stays at or above the paid pairs; and
+ * a new time can't clash with another open play its players joined.
+ * Fees already paid keep their amount.
+ */
+export async function updateOpenPlay(
+  db: Db,
+  id: string,
+  input: OpenPlayEdit,
+): Promise<string | null> {
+  const play = await getOpenPlay(db, id);
+  if (!play) return "Open play not found";
+  const moved =
+    input.playDate !== play.playDate ||
+    input.startTime !== play.startTime ||
+    input.endTime !== play.endTime;
+  const reranked = input.levels.join() !== play.levels.join();
+  if (play.live && (moved || reranked)) {
+    return "It's running now: end it before changing its date, time, or ranks";
+  }
+  if (input.maxPairs !== null && input.maxPairs < play.pairCount) {
+    return `${play.pairCount} pairs have paid already; allow at least ${play.pairCount}`;
+  }
+  const { pairs: paid, pending, solos } = await listRegistrations(db, id);
+  const inUse = new Map<Level, number>();
+  const tally = (level: Level) => inUse.set(level, (inUse.get(level) ?? 0) + 1);
+  for (const p of paid) tally(pairLevel(p.members.map((m) => m.level)));
+  for (const p of pending) {
+    tally(p.requestedLevel ?? pairLevel(p.members.map((m) => m.level)));
+  }
+  for (const s of solos) tally(s.requestedLevel ?? s.level);
+  for (const [level, count] of inUse) {
+    if (!input.levels.includes(level)) {
+      return `${LEVEL_INFO[level].label} has ${count} sign-up${count === 1 ? "" : "s"}; keep it, or move them first`;
+    }
+  }
+  if (moved) {
+    const playerIds = [
+      ...paid.flatMap((p) => p.members),
+      ...pending.flatMap((p) => p.members),
+      ...solos,
+    ].map((m) => m.playerId);
+    if (playerIds.length) {
+      const elsewhere = await db
+        .select({
+          name: players.name,
+          playDate: openPlays.playDate,
+          startTime: openPlays.startTime,
+          endTime: openPlays.endTime,
+        })
+        .from(registrations)
+        .innerJoin(players, eq(players.id, registrations.playerId))
+        .innerJoin(openPlays, eq(openPlays.id, registrations.openPlayId))
+        .where(
+          and(
+            inArray(registrations.playerId, playerIds),
+            ne(openPlays.id, id),
+            eq(openPlays.playDate, input.playDate),
+          ),
+        );
+      const clash = elsewhere.find((b) => overlaps(b, input));
+      if (clash) {
+        return `${clash.name} is in another open play at that time`;
+      }
+    }
+  }
+  await db
+    .update(openPlays)
+    .set({
+      playDate: input.playDate,
+      startTime: input.startTime,
+      endTime: input.endTime,
+      levels: input.levels,
+      maxPairs: input.maxPairs,
+      feeCents: input.feeCents,
+    })
+    .where(eq(openPlays.id, id));
   return null;
 }
 
@@ -1773,6 +1867,51 @@ export async function recentMatches(
     db,
     ids.map((r) => r.id),
   );
+}
+
+/**
+ * The running session's scored games, side by side as queue units: each
+ * player maps to their pair in this open play (or stays themselves).
+ */
+export async function liveSessionGames(
+  db: Db,
+  openPlayId: string,
+): Promise<UnitGame[]> {
+  if (!z.uuid().safeParse(openPlayId).success) return [];
+  const rows = await db
+    .select({
+      id: matches.id,
+      scoreA: matches.scoreA,
+      scoreB: matches.scoreB,
+      side: matchPlayers.side,
+      unit: sql<string>`coalesce(${registrations.pairId}, ${matchPlayers.playerId})`,
+    })
+    .from(matches)
+    .innerJoin(sessions, eq(sessions.id, matches.sessionId))
+    .innerJoin(matchPlayers, eq(matchPlayers.matchId, matches.id))
+    .leftJoin(
+      registrations,
+      and(
+        eq(registrations.playerId, matchPlayers.playerId),
+        eq(registrations.openPlayId, openPlayId),
+      ),
+    )
+    .where(live(openPlayId))
+    .orderBy(asc(matches.endedAt));
+  const games = new Map<string, UnitGame>();
+  for (const r of rows) {
+    const g = games.get(r.id) ?? {
+      id: r.id,
+      sideA: [],
+      sideB: [],
+      scoreA: r.scoreA,
+      scoreB: r.scoreB,
+    };
+    const side = r.side === "A" ? g.sideA : g.sideB;
+    if (!side.includes(r.unit)) side.push(r.unit);
+    games.set(r.id, g);
+  }
+  return [...games.values()];
 }
 
 /** The player with this (verified or desk-entered) email, if any. */

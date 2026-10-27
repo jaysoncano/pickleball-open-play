@@ -18,7 +18,7 @@ import {
   readPlayerToken,
   type PlayerSession,
 } from "./profile/verify";
-import { canManage, type Account } from "./roles";
+import { canInvite, canManage, type Account } from "./roles";
 
 /** The first admin's credentials, used only while no admin account exists. */
 export function adminEnv(): AdminEnv {
@@ -82,6 +82,27 @@ export async function requireOpenPlay(openPlayId: string): Promise<Account> {
   const me = await requireStaff();
   if (!(await managesOpenPlay(me, openPlayId))) {
     throw new Error("Only this open play's hosts can do that.");
+  }
+  return me;
+}
+
+/** Whether this account chooses the open play's hosts (main host, admin). */
+export async function invitesHosts(
+  me: Account | null,
+  openPlayId: string,
+): Promise<boolean> {
+  if (!me) return false;
+  return canInvite(me, await openPlayManagers(getDb(), openPlayId));
+}
+
+/**
+ * Throw unless the request is from the open play's main host (the account
+ * that scheduled it) or an admin: only they invite and remove hosts.
+ */
+export async function requireMainHost(openPlayId: string): Promise<Account> {
+  const me = await requireStaff();
+  if (!(await invitesHosts(me, openPlayId))) {
+    throw new Error("Only this open play's main host can choose its hosts.");
   }
   return me;
 }

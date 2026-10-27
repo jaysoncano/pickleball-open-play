@@ -137,8 +137,10 @@ hosts rows cascade. `lib/auth-server.ts`: `requireAdmin()` (role admin:
 protests, levels, QR codes page, accounts), `requireStaff()` (any
 account: `createOpenPlay`, `openPlaysOn`, scoped to `managedBy` for
 hosts), `requireOpenPlay(id)` (session actions, desk registration,
-`registrationsFor`, `paidPairsFor`, `inviteHost`/`removeHost`;
-`confirmPayment`/`removePairEntry` look up the pair's open play first).
+`registrationsFor`, `paidPairsFor`, `editOpenPlay`, venue and banner;
+`confirmPayment`/`removePairEntry` look up the pair's open play first),
+`requireMainHost(id)` (creator or admin, `canInvite`: `inviteHost`,
+`removeInvite`, `removeHost`).
 `staffFor(account, playerId)`: admins, or a host the player registered
 with (`playerInManagedOpenPlay`); it gates `playerQrCode` and the staff
 side of `profileEditor()`. `setAdminRole`/`removeAdmin` keep at least
@@ -150,7 +152,8 @@ session. Public pages show emails only masked to the first letter
 `sendEmailCode` / `confirmEmailCode` (by claim token). Profile edits
 (`saveProfile`, `uploadPhoto`, `deletePhoto`) need `profileEditor()`: an
 staff for that player or the verified player. `newQrCode` is admin
-only; `profileSetup(ids)` (no QR secret in the result) is staff.
+only; `profileSetup(ids)` (no QR secret in the result) is staff, limited
+to the players of open plays a host runs.
 
 ## Hosts, check-in, shared players
 
@@ -166,6 +169,11 @@ email_verified_at is not null`. `login` sends unverified accounts a code
   account (subqueries). The group is optional: `createOpenPlay` and
   `saveGroup` share `applyGroup` (name when given, logo or `removeLogo`).
 - `setVenue(db, id, {venue, location})` edits an existing open play.
+- `updateOpenPlay(db, id, OpenPlayEdit)` → error or null: date, times,
+  levels, `max_pairs`, `fee_cents`. Refuses date/time/level changes while
+  a session is active, dropping a level that paid or pending pairs or
+  solos use, a cap below the paid pairs, and a new window that overlaps
+  another open play one of its players joined.
 - `saveBanner` / `removeBanner` / `getBanner`; `OpenPlay.bannerUpdatedAt`.
   Upload rules and the placeholder theme live in `lib/banner.ts`.
 - `getGroup(db, id)` → `{id, name, logoUpdatedAt}` (public fields only)

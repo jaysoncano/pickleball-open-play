@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { ROLE_INFO, ROLES, type Role } from "@/lib/roles";
+import { ConfirmSubmit } from "@/components/ui/confirm-submit";
 
 const INPUT =
   "min-h-12 rounded-2xl bg-sky-50 px-4 text-base ring-2 ring-sky-100 outline-none focus:ring-sky-400";
@@ -83,9 +84,13 @@ export function ChangePasswordForm() {
         <Field label="Confirm" name="confirm" autoComplete="new-password" />
       </div>
       <Result state={state} ok="Password changed" />
-      <Button type="submit" variant="secondary" disabled={pending}>
+      <ConfirmSubmit
+        confirmLabel="Tap again to change password"
+        variant="secondary"
+        disabled={pending}
+      >
         {pending ? "Saving…" : "Change password"}
-      </Button>
+      </ConfirmSubmit>
     </form>
   );
 }
@@ -178,7 +183,10 @@ export function RemoveAdmin({
   );
 }
 
-/** Switch another account between admin and host. */
+/**
+ * Switch another account between admin and host. Picking a level asks
+ * first; nothing changes until it's confirmed.
+ */
 export function RoleSelect({
   id,
   username,
@@ -190,19 +198,18 @@ export function RoleSelect({
 }) {
   const [busy, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState<Role>(role);
+  const [next, setNext] = useState<Role | null>(null);
   return (
     <>
       <select
         aria-label={`Account level for ${username}`}
-        defaultValue={role}
+        value={next ?? saved}
         disabled={busy}
         onChange={(e) => {
-          const next = e.target.value;
-          start(async () => {
-            const problem = await setAccountRole(id, next);
-            setError(problem);
-            if (problem) e.target.value = role;
-          });
+          const picked = e.target.value as Role;
+          setError(null);
+          setNext(picked === saved ? null : picked);
         }}
         className="min-h-11 rounded-xl bg-sky-50 px-2 font-semibold ring-2 ring-sky-100 outline-none focus:ring-sky-400"
       >
@@ -212,6 +219,35 @@ export function RoleSelect({
           </option>
         ))}
       </select>
+      {next && (
+        <span
+          role="group"
+          aria-label="Confirm the new level"
+          className="flex w-full flex-wrap items-center gap-2 rounded-2xl bg-rose-50 px-3 py-2"
+        >
+          <span className="flex-1 text-sm font-semibold text-rose-800">
+            Make {username} {ROLE_INFO[next].label === "Admin" ? "an" : "a"}{" "}
+            {ROLE_INFO[next].label}? {ROLE_INFO[next].blurb}
+          </span>
+          <Button
+            variant="danger"
+            disabled={busy}
+            onClick={() =>
+              start(async () => {
+                const problem = await setAccountRole(id, next);
+                setError(problem);
+                if (!problem) setSaved(next);
+                setNext(null);
+              })
+            }
+          >
+            {busy ? "Saving…" : "Yes, change it"}
+          </Button>
+          <Button variant="ghost" disabled={busy} onClick={() => setNext(null)}>
+            Cancel
+          </Button>
+        </span>
+      )}
       {error && (
         <span
           role="alert"
@@ -302,9 +338,9 @@ export function GroupForm({
           </p>
         )
       )}
-      <Button type="submit" disabled={pending}>
+      <ConfirmSubmit confirmLabel="Tap again to save group" disabled={pending}>
         {pending ? "Saving…" : "Save group"}
-      </Button>
+      </ConfirmSubmit>
     </form>
   );
 }

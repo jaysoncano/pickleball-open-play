@@ -64,6 +64,9 @@ export async function SiteNav() {
   const pending = me.role === "admin" ? await pendingProtestCount(getDb()) : 0;
   return (
     <SiteNavShell>
+      <Link href="/host" className={LINK}>
+        <span aria-hidden>🏓</span> My open plays
+      </Link>
       {me.role === "admin" && (
         <Link href="/admin/protests" className={LINK}>
           <span aria-hidden>📣</span> Protests

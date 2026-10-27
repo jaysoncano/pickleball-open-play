@@ -11,7 +11,10 @@ import {
   PublicSoloSchema,
   SoloRegistrationSchema,
 } from "@/lib/registration/forms";
-import type { OpenPlayInput } from "@/lib/registration/open-play";
+import {
+  OpenPlayEditSchema,
+  type OpenPlayInput,
+} from "@/lib/registration/open-play";
 import {
   confirmEmail,
   createOpenPlay,
@@ -22,6 +25,8 @@ import {
   hasPaidRegistration,
   listOpenPlays,
   listRegistrations,
+  liveSessionGames,
+  endSession,
   pairMembers,
   confirmPairPayment,
   pairSolos,
@@ -36,6 +41,7 @@ import {
   removeOpenPlay,
   setLevel,
   startSession,
+  updateOpenPlay,
   updateProfile,
   type Db,
 } from "./queries";
@@ -112,6 +118,11 @@ describe("open plays", () => {
       [op, 1, false],
     ]);
     expect(await listOpenPlays(db, { from: "2026-10-28" })).toHaveLength(1);
+    const earlier = await createOpenPlay(db, play({ playDate: "2026-10-20" }));
+    const earliest = await createOpenPlay(db, play({ playDate: "2026-10-01" }));
+    expect((await listOpenPlays(db, { before: DAY })).map((o) => o.id)).toEqual(
+      [earlier, earliest],
+    );
     const state = createSession(
       {
         startTime: "18:00",
@@ -426,6 +437,146 @@ describe("pairs as queue units", () => {
       match.players.find((p) => p.playerId === id)?.side;
     expect(sideOf(p1.players[1].id)).toBe(sideOf(ana));
     expect(sideOf(p2.players[0].id)).not.toBe(sideOf(ana));
+  });
+
+  it("lists the live session's games by pair, until it ends", async () => {
+    const p1 = await okPair(anaP(), person("Ben"));
+    const p2 = await okPair(person("Cy"), person("Dee"));
+    let state = createSession(
+      {
+        startTime: "18:00",
+        endTime: "21:00",
+        courtCount: 1,
+        playersPerCourt: 2,
+      },
+      await paidPairs(db, op),
+      0,
+      undefined,
+      () => 0,
+    );
+    await startSession(db, op, state);
+    expect(await liveSessionGames(db, op)).toEqual([]);
+    const court = state.courts[0].id;
+    state = finishGame(startGame(state, court, 0), court, 600_000, () => 0);
+    const game = state.matches.at(-1)!;
+    await recordMatch(db, op, state, game, { scoreA: 11, scoreB: 7 });
+    const [g] = await liveSessionGames(db, op);
+    expect([...g.sideA, ...g.sideB].sort()).toEqual(
+      [p1.pairId, p2.pairId].sort(),
+    );
+    expect(g.sideA).toEqual([game.playerIds[0]]);
+    expect([g.scoreA, g.scoreB]).toEqual([11, 7]);
+    await endSession(db, op);
+    expect(await liveSessionGames(db, op)).toEqual([]);
+    expect(await liveSessionGames(db, "junk")).toEqual([]);
+  });
+});
+
+describe("updateOpenPlay", () => {
+  const edit = (over: Record<string, unknown> = {}) =>
+    OpenPlayEditSchema.parse({
+      playDate: DAY,
+      startTime: "18:00",
+      endTime: "20:00",
+      levels: levelsBetween("beginner", "pro"),
+      maxPairs: "",
+      fee: "300",
+      ...over,
+    });
+
+  it("saves a new date, time, ranks, cap, and entry", async () => {
+    expect(
+      await updateOpenPlay(
+        db,
+        op,
+        edit({
+          playDate: "2026-10-30",
+          startTime: "07:00",
+          endTime: "09:30",
+          levels: ["novice", "advanced"],
+          maxPairs: "6",
+          fee: "250",
+        }),
+      ),
+    ).toBeNull();
+    expect(await getOpenPlay(db, op)).toMatchObject({
+      playDate: "2026-10-30",
+      startTime: "07:00",
+      endTime: "09:30",
+      levels: ["novice", "advanced"],
+      maxPairs: 6,
+      feeCents: 25000,
+    });
+    expect(await updateOpenPlay(db, MISSING, edit())).toBe(
+      "Open play not found",
+    );
+  });
+
+  it("keeps ranks that have sign-ups", async () => {
+    await okPair(anaP(), person("Ben"));
+    await registerSolo(db, solo(person("Cy")));
+    expect(await updateOpenPlay(db, op, edit({ levels: ["novice"] }))).toBe(
+      "Beginner has 2 sign-ups; keep it, or move them first",
+    );
+    expect(await updateOpenPlay(db, op, edit({ levels: ["beginner"] }))).toBe(
+      null,
+    );
+  });
+
+  it("keeps the cap at or above the paid pairs", async () => {
+    await okPair(anaP(), person("Ben"));
+    await okPair(person("Cy"), person("Dee"));
+    await okPair(person("Eve"), person("Fay"));
+    expect(await updateOpenPlay(db, op, edit({ maxPairs: "2" }))).toBe(
+      "3 pairs have paid already; allow at least 3",
+    );
+    expect(await updateOpenPlay(db, op, edit({ maxPairs: "3" }))).toBeNull();
+  });
+
+  it("won't move it onto another open play its players joined", async () => {
+    await okPair(anaP(), person("Ben"));
+    const later = await createOpenPlay(
+      db,
+      play({ startTime: "20:00", endTime: "22:00" }),
+    );
+    await registerSolo(db, solo(anaP(), later));
+    expect(
+      await updateOpenPlay(
+        db,
+        op,
+        edit({ startTime: "19:00", endTime: "21:00" }),
+      ),
+    ).toBe("Ana is in another open play at that time");
+    expect(
+      await updateOpenPlay(db, op, edit({ playDate: "2026-10-28" })),
+    ).toBeNull();
+  });
+
+  it("only changes the cap and entry while it's running", async () => {
+    await startSession(
+      db,
+      op,
+      createSession(
+        {
+          startTime: "18:00",
+          endTime: "20:00",
+          courtCount: 1,
+          playersPerCourt: 2,
+        },
+        [],
+        0,
+      ),
+    );
+    expect(await updateOpenPlay(db, op, edit({ endTime: "21:00" }))).toBe(
+      "It's running now: end it before changing its date, time, or ranks",
+    );
+    expect(await updateOpenPlay(db, op, edit({ levels: ["pro"] }))).toBe(
+      "It's running now: end it before changing its date, time, or ranks",
+    );
+    expect(
+      await updateOpenPlay(db, op, edit({ maxPairs: "10", fee: "350" })),
+    ).toBeNull();
+    expect((await getOpenPlay(db, op))?.feeCents).toBe(35000);
   });
 });
 

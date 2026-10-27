@@ -77,9 +77,11 @@ export function DashboardTabs<Id extends string>({
               aria-controls={`panel-${tab.id}`}
               tabIndex={selected ? 0 : -1}
               onClick={() => select(tab.id)}
-              className={`flex min-h-12 flex-1 items-center justify-center gap-2 rounded-3xl font-display text-lg font-semibold transition-all focus-visible:outline-4 focus-visible:outline-sky-400 ${selected ? "bg-fuchsia-500 text-white shadow-[0_4px_0_0_#a21caf]" : "text-ink/60 hover:bg-fuchsia-50 hover:text-fuchsia-600"}`}
+              className={`flex min-h-12 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-3xl px-1 font-display text-base font-semibold sm:gap-2 sm:text-lg transition-all focus-visible:outline-4 focus-visible:outline-sky-400 ${selected ? "bg-fuchsia-500 text-white shadow-[0_4px_0_0_#a21caf]" : "text-ink/60 hover:bg-fuchsia-50 hover:text-fuchsia-600"}`}
             >
-              <span aria-hidden>{tab.emoji}</span>
+              <span aria-hidden className="max-sm:hidden">
+                {tab.emoji}
+              </span>
               {tab.label}
               {tab.badge !== undefined && (
                 <span

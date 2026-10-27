@@ -21,6 +21,7 @@ import {
   currentPlayer,
   profileEditor,
   requireAdmin,
+  requireMainHost,
   requireOpenPlay,
   requireStaff,
   staffFor,
@@ -68,8 +69,10 @@ import {
   ScoreSchema,
 } from "@/lib/ranking/forms";
 import { LevelSchema, levelRank, type Level } from "@/lib/ranking/levels";
+import type { UnitGame } from "@/lib/ranking/standings";
 import { notReady, pickRegistered } from "@/lib/registration/gate";
 import {
+  OpenPlayEditSchema,
   OpenPlaySchema,
   ranksLabel,
   whenLabel,
@@ -195,7 +198,7 @@ export async function login(
     redirect(`/host/verify?u=${encodeURIComponent(admin.username)}`);
   }
   await setAdminCookie(secret, admin);
-  redirect("/");
+  redirect("/host");
 }
 
 // ── Host sign-up (email verified with a code) ──────────────────────────────
@@ -277,7 +280,7 @@ export async function verifyHostCode(
   });
   if (error) return { error };
   await setAdminCookie(secret, admin);
-  redirect("/");
+  redirect("/host");
 }
 
 export async function logout() {
@@ -315,7 +318,25 @@ export async function createOpenPlay(
   const id = await q.createOpenPlay(db, parsed.data, me.id);
   if (banner) await q.saveBanner(db, id, banner.type, await bytes(banner));
   revalidatePath("/", "layout");
-  return { error: null, ok: true };
+  redirect(`/open-plays/${id}/manage`);
+}
+
+/** Its hosts: change an open play's date, time, ranks, cap, or entry. */
+export async function editOpenPlay(
+  _prev: FormState,
+  form: FormData,
+): Promise<FormState> {
+  const id = String(form.get("openPlayId") ?? "");
+  await requireOpenPlay(id);
+  const parsed = OpenPlayEditSchema.safeParse({
+    ...Object.fromEntries(form),
+    levels: form.getAll("levels"),
+  });
+  if (!parsed.success) return { error: firstError(parsed) };
+  const error = await q.updateOpenPlay(getDb(), id, parsed.data);
+  if (error) return { error };
+  revalidatePath("/", "layout");
+  return { error: null, ok: true, message: "Open play saved" };
 }
 
 /** Its hosts: change where an open play is played. */
@@ -386,7 +407,7 @@ export async function inviteHost(
   form: FormData,
 ): Promise<FormState> {
   const openPlayId = String(form.get("openPlayId") ?? "");
-  const me = await requireOpenPlay(openPlayId);
+  const me = await requireMainHost(openPlayId);
   const raw = String(form.get("who") ?? "");
   const who = raw.includes("@")
     ? EmailSchema.safeParse(raw)
@@ -424,22 +445,22 @@ export async function inviteHost(
     : { error: `Invite saved, but the email failed: ${sent.error}` };
 }
 
-/** Cancel an email invitation that hasn't been accepted. */
+/** Main host: cancel an email invitation that hasn't been accepted. */
 export async function removeInvite(
   openPlayId: string,
   email: string,
 ): Promise<void> {
-  await requireOpenPlay(openPlayId);
+  await requireMainHost(openPlayId);
   await q.removeInvite(getDb(), openPlayId, email);
   revalidatePath("/", "layout");
 }
 
-/** Take an invited host off an open play. Its creator always stays. */
+/** Main host: take an invited host off. Its creator always stays. */
 export async function removeHost(
   openPlayId: string,
   adminId: string,
 ): Promise<void> {
-  await requireOpenPlay(openPlayId);
+  await requireMainHost(openPlayId);
   await q.removeHost(getDb(), openPlayId, adminId);
   revalidatePath("/", "layout");
 }
@@ -578,6 +599,14 @@ export async function finishMatch(
     parsedScore.data,
   );
   return ok ? null : "This open play isn't running";
+}
+
+/** The running session's scored games by pair, for the standings. */
+export async function liveStandingGames(
+  openPlayId: string,
+): Promise<UnitGame[]> {
+  await requireOpenPlay(openPlayId);
+  return q.liveSessionGames(getDb(), openPlayId);
 }
 
 // ── Levels and protests ────────────────────────────────────────────────────
@@ -853,12 +882,17 @@ export async function newQrCode(playerId: string): Promise<void> {
 
 /** Today's players and how far each is with their profile (host view). */
 export async function profileSetup(playerIds: string[]) {
-  await requireStaff();
+  const me = await requireStaff();
   const db = getDb();
   const ids = playerIds.filter((id) => z.uuid().safeParse(id).success);
   // Session units are pairs: list each pair's players.
   const members = await q.pairMembers(db, ids);
-  const people = ids.flatMap((id) => members.get(id)?.map((m) => m.id) ?? [id]);
+  let people = ids.flatMap((id) => members.get(id)?.map((m) => m.id) ?? [id]);
+  // Hosts only see players of the open plays they run.
+  if (me.role !== "admin") {
+    const mine = new Set(await q.managedPlayerIds(db, me.id));
+    people = people.filter((id) => mine.has(id));
+  }
   const rows = await q.listClaimTokens(db, people);
   // The QR secret stays on the server; playerQrCode renders it on demand.
   return rows.map((row) => ({

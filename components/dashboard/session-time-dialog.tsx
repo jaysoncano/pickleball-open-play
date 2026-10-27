@@ -12,6 +12,7 @@ import {
   rescheduleWindow,
   sessionMinutes,
 } from "@/lib/queue/time";
+import { ConfirmSubmit } from "@/components/ui/confirm-submit";
 
 const QUICK_ADD = [
   { minutes: -15, label: "−15 min" },
@@ -63,13 +64,15 @@ export function SessionTimeDialog({
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button
+          <ConfirmSubmit
             variant="lime"
+            confirmLabel="Tap again to save"
+            warning=""
             disabled={Boolean(error) || !changed}
             onClick={() => onSave(startTime, endTime, overtime)}
           >
             Save
-          </Button>
+          </ConfirmSubmit>
         </>
       }
     >

@@ -37,6 +37,7 @@ import { MatchHistory } from "./match-history";
 import { PlayerStatsTable } from "./player-stats-table";
 import { ProfilesPanel } from "./profiles-panel";
 import { SessionDate } from "./session-date";
+import { StandingsPanel } from "./standings-panel";
 import { QueueList } from "./queue-list";
 import { SessionBar } from "./session-bar";
 import { StatsRow } from "./stats-row";
@@ -59,7 +60,9 @@ export function Dashboard({
   const { update: act, replace, saveError, openPlayId } = useSessionStore();
   const now = useNow();
   const [scoringCourt, setScoringCourt] = useState<string | null>(null);
-  const [tab, setTab] = useState<"courts" | "profiles" | "history">("courts");
+  const [tab, setTab] = useState<
+    "courts" | "profiles" | "history" | "standings"
+  >("courts");
   const setup = useProfileSetup(Object.keys(session.players));
   const needSetup = setup.filter((r) => r.status !== "complete").length;
   const [swapTarget, setSwapTarget] = useState<string | null>(null);
@@ -146,6 +149,7 @@ export function Dashboard({
             emoji: "🏆",
             badge: session.matches.length,
           },
+          { id: "standings", label: "Standings", emoji: "🥇" },
         ]}
       />
 
@@ -272,6 +276,15 @@ export function Dashboard({
         <SessionDate session={session} />
         <PlayerStatsTable session={session} />
         <MatchHistory matches={session.matches} />
+      </div>
+
+      <div {...tabPanelProps("standings")} hidden={tab !== "standings"}>
+        <StandingsPanel
+          openPlayId={openPlayId}
+          session={session}
+          ranks={ranks}
+          active={tab === "standings"}
+        />
       </div>
 
       <OvertimeToasts

@@ -40,6 +40,19 @@ export function canManage(
   );
 }
 
+/**
+ * Who chooses an open play's hosts (invites and removes them): its main
+ * host, the account that scheduled it, and admins. Co-hosts run it but
+ * can't change who else does.
+ */
+export function canInvite(
+  account: Pick<Account, "id" | "role"> | null,
+  play: Managers | null,
+): boolean {
+  if (!account || !play) return false;
+  return account.role === "admin" || play.createdBy === account.id;
+}
+
 /** The group a host runs open plays as, e.g. "Makati Dinkers". */
 export const GroupNameSchema = z
   .string("Enter your group's name")
