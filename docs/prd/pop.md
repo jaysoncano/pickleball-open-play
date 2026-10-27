@@ -1,0 +1,266 @@
+# PRD: POP · Pickleball Open Play
+
+Open-play court queue for pickleball, like Paddle Stack Queuing, but
+everything is saved in a database: sessions, every match with its score,
+and each player's history. That history is the reference when a player
+protests their skill level.
+
+## Users
+
+- **Staff accounts** sign in at `/admin/login` ("Staff") with a
+  **username and password**. The first account comes from
+  `ADMIN_USERNAME`/`ADMIN_PASSWORD` and is an admin. Each account has a
+  **level**:
+  - **Admin:** everything. Every open play (home "Mine / All" toggle),
+    levels, protests, QR codes, and accounts. Settings: add accounts
+    (pick Admin or Host), switch an account's level, remove accounts
+    (never yourself or the last admin).
+  - **Host:** schedules open plays and runs only the ones they created
+    or were invited to: register pairs, confirm payments, run the
+    courts, check-in QR codes and profile edits for players signed up
+    to their open plays. No protests, level changes, QR-codes page, or
+    account management. Settings: change their own password.
+  - Any account: Settings → change your password (signs out your other
+    devices).
+- **Host self sign-up** (`/host/signup`, linked from the Staff sign-in
+  and the public home): group name, email, username, password → a
+  6-digit code is emailed → `/host/verify` → the account opens and signs
+  in. Until verified the account can't sign in (signing in sends a new
+  code). Signing up again with an unverified email replaces that account.
+- **Group (optional):** an account can have a group name and logo
+  (JPEG/PNG/WebP up to 300 KB). Set them in the New open play form's
+  "Hosted by" section (prefilled; a blank name keeps the current one) or
+  in Settings → Your group. Scheduling never requires them. Cards and the
+  public open play page show the court venue, location, "Hosted by
+  {group}" (linking to the group's public page), and the logo.
+- **Venue is required** (name and location) on new open plays. Open plays
+  without one (made before venues existed) show "📍 Venue to be
+  announced" to players, and staff get an amber 📍 Add venue button on the
+  card that opens `/open-plays/[id]/details` (`saveVenue`, its hosts only).
+  Cards show the venue in bold with the location under it.
+- **Banner:** each open play can have a banner photo (JPEG/PNG/WebP; the
+  browser shrinks it to 1600 px wide and up to 600 KB). Add it in the New
+  open play form or later from the card's ✏️ Venue & banner button
+  (`/open-plays/[id]/details`, its hosts only; removing takes two taps).
+  Without one, a colorful court placeholder shows (its colors stay the
+  same per open play, with the venue name on it).
+- **Card and open play page header:** banner on top with the ranks and
+  Live/Full badges on it, then the group's logo over its edge (no logo:
+  the group's initials, or a paddle when unnamed) and "Hosted by {group}"
+  (unnamed: "POP open play").
+- **Group public page** (`/groups/[id]`, the account id): anyone can open
+  it, like a public profile. It shows the logo, the group name ("Open play
+  host" when unnamed), how many open plays it hosted, its courts, Live
+  now, Coming up, and the 6 most recent past open plays, plus a Share
+  button (share sheet or copy link). It lists only open plays the account
+  scheduled, never its username or email. Staff reach theirs from "Your
+  public page" on the home page.
+- **Host workflow (admin-added):** an admin adds the host's account in Settings
+  (level: Host) and shares the username and password → the host signs in
+  and schedules open plays, which only they (and admins) see under
+  "Mine" → on an open play card, **Hosts** → invite by **username or
+  email**. An existing (verified) account joins right away; an email
+  without one gets an invitation email linking to host sign-up with the
+  email filled in, and is listed under "Waiting to sign up" (cancellable)
+  until they verify, then the open play is on their list. Invited hosts can be removed; the creator
+  always stays. Removing an account keeps its open plays.
+- **Players / public:** no sign-in. See the live board, the players list,
+  any profile, and can file a level protest.
+- **Player sign-in** (`/login`): **username and password**, or a 6-digit
+  email code (no password yet / forgot it). Players set their username and
+  password on their profile edit page once their payment is confirmed;
+  admins can set them too.
+- **Player (verified):** scans their profile QR code, verifies their email
+  with a 6-digit code, then edits their own basic info and photo.
+
+## Open plays by rank
+
+- Staff **schedule open plays** on the home page (`/`): **venue name and
+  location**, date, start and end time, the **ranks** it runs (tick one or more levels, e.g.
+  Beginner and Novice), an optional **max pairs**, and the entry per pair.
+- **Venue autocomplete:** venues saved with past open plays are
+  suggested (one per name, newest first; a host sees their own open
+  plays' venues, an admin all). Picking a saved venue fills in its
+  location; the form starts with the last venue used. Cards, the public
+  open play page, the board heading, and receipt emails show the venue.
+- **Staff see only their open plays** on `/` and at the Player desk: the
+  ones they created or were invited to host. Admins can switch to
+  **All**. Opening an open play you don't run shows its public page.
+- **One open play, several ranks, shared courts.** Each ticked rank has
+  its own line in the queue; pairs only play pairs of their rank. When
+  starting, the admin picks the pairs, then the courts: each court gets a
+  rank, suggested from how many pairs each rank has (e.g. 4 courts →
+  2 Beginner, 2 Novice). A court's rank can be switched from its card
+  anytime; a game in progress finishes first, an idle court hands its
+  group back to the line.
+- Several open plays can also run at once (separate courts and queues).
+- **Public:** the home lists open plays by date; each card is a link to
+  the open play. There, each rank is a card linking to that rank: who's in
+  (pairs, and players at that level looking for a partner), then how to
+  join (booth, fee, pair level rule, solo option). A live open play links
+  to its court board. Admin cards also link through, with Register pairs
+  and Remove on top.
+- A pair joins the rank of its level (the stronger player's) when that
+  rank is ticked. **Once either player is, e.g., Novice, the pair can
+  never join a lower rank** (Beginner): the desk refuses it and names who
+  ("Nia is Novice, so this pair can't join Beginner"). A solo player can
+  sign up unless they're above every rank; pairing two solos checks the
+  pair's level.
+- If a player is promoted after paying, the pair is re-checked: setup and
+  late arrivals show it as blocked with the reason, and it can't be added
+  to the queue. Full open plays refuse
+  new pairs. A player can't be in two open plays that overlap in time.
+- An open play nobody signed up for can be removed (two taps).
+
+## Joining open play: pairs, paid at the booth
+
+### Online sign-up, admin-confirmed payment
+
+1. On a rank's public page, players choose **Pair** or **Solo**. A pair
+   signs up (queue name, first and last name, email for both). A solo
+   player signs up alone and joins that rank's "looking for a partner"
+   list (refused if above the rank); the desk pairs them and the pair pays
+   at the booth. A taken name only matches that player when the
+   email is the one on file. The sign-up shows as **Pending payment**
+   (also on the public roster as "Awaiting payment"). No email yet.
+2. They pay at the management booth. On the Player desk, **Pending
+   payments** lists them per open play; the admin taps **Confirm
+   payment** (amount, method, reference) or **Reject**.
+3. Confirming checks rank and capacity again, marks the pair paid (it
+   counts toward the cap and can join the queue), and emails both players
+   the receipt with their profile link.
+4. **Profile editing opens only after a confirmed payment** (QR code,
+   "This is me", receipt link, saving info or photo). Admins can always
+   edit, and can remove a pair (refund) while its open play isn't running.
+
+- Players join **as a pair** for one open play. One **entry for the pair,
+  paid in full** (no split payments): amount (default `OPEN_PLAY_FEE`),
+  method (cash, e-wallet, card at the booth), optional reference.
+- The **Player desk** (`/admin/players`): pick the date, then the open
+  play (rank, time, spots left), then register a pair: each player is
+  picked from registered players or added as new (queue name, first name,
+  last name, email — all required). The amount defaults to that open
+  play's entry.
+- A player who comes alone signs up **solo** (no payment yet). The desk
+  picks two solos, pairs them, and records the pair's full entry.
+- After each sign-up, every player gets an email: receipt (date, partner,
+  entry) or "looking for a partner", with a one-tap link (7 days) that
+  confirms their email and opens their profile editor (`/confirm/[token]`).
+- **Pair level** = the stronger player's level. Matchmaking keeps pairs
+  close in level (after games-played fairness).
+- Only that open play's paid pairs can join its queue. Only players who have signed
+  up at least once can edit their own info (admins always can).
+- Online card payment is planned; it needs a payment provider (Stripe via
+  the Vercel Marketplace) connected to the project first.
+
+## Open play (admin, `/`)
+
+- Each open play starts from its page: its **paid pairs** (tap to add, or
+  add all) → courts (doubles by pairs: two pairs per court), each with a
+  rank. Date and time come from the open play.
+- Fixed partners: the queue is a list of pairs; courts are pair vs pair.
+  Each recorded game is stored per player, so individual stats and
+  ranking keep working.
+- Same live dashboard: courts, up next, queue, drag to reorder, swap,
+  pause, overtime alerts, history tab. **Late arrivals**: pairs paid at the
+  desk for this open play appear under the queue (refreshes every 20 s).
+- **Game done** asks for the **final score** (no ties; quick picks 11, 15,
+  21). Saving records the match with each player's current level.
+- Pair names come from the players ("Ana & Ben"); rename players at the
+  desk, not in the queue.
+- Changes save in the background; a red banner shows if a save fails.
+- Only one session runs at a time. Ending it keeps all recorded matches.
+
+## Public board (`/` when not signed in)
+
+Read-only courts, up next, and queue, refreshed every 15 seconds. Names
+link to profiles.
+
+## Players (`/players`, `/players/[id]`)
+
+- Directory: search, filter by level, W–L per player.
+- Profile: level, games, W–L, win rate, point diff, court time, W–L by the
+  toughest opponent's level, and full match history (date, court,
+  duration, score, partners and opponents with their level at the time).
+- Level history: every change with its note.
+- **Profile card** (public): photo, first and last name (queue name under
+  it), level,
+  ranking (#n of m), matches, wins, losses, win rate, point diff, court
+  time, home club, playing hand, bio, member since. Email and phone are
+  never shown publicly.
+- **Ranking:** players with at least one game, by most wins, then win
+  rate, then fewer games. Same wins and games share a rank. The directory
+  can sort by ranking and shows photos and first and last names.
+
+## Player info and QR codes
+
+- Every player has a QR code. Admins see it on the profile and print all
+  of them from `/admin/qr-codes`. "New code" voids a printed one.
+- Scanning opens `/claim/<token>`: enter email → a 6-digit code is emailed
+  (10 min, 5 tries, one per minute) → verified devices stay signed in for
+  30 days and land on `/players/[id]/edit`.
+- The first verified email is linked to the player and is **required**
+  for future features. Later codes only go to that email; an admin can
+  change it from the edit page.
+- Basic info: first name and last name (required), email (required,
+  private), phone
+  (optional, private), home club or city, playing hand, bio (280 chars).
+- Photo: JPEG, PNG, or WebP, resized in the browser to 512 px, max 300 KB.
+  Remove with a two-tap button.
+- Admins can edit any player's info and photo without verifying.
+
+### Onboarding workflow (where cards and QR codes show)
+
+Status: **Needs setup** (no verified email) → **Info missing** (no full
+name or photo) → **Complete**.
+
+1. **Check-in (main path).** The host dashboard has a **Profiles** tab
+   (badge = players not complete) listing today's session. **Show QR**
+   puts the player's code full screen on the host's phone; the player
+   scans it while waiting in the queue. Status refreshes every 20 s.
+2. **Printed cards.** `/admin/qr-codes` defaults to **Needs setup** (only
+   players without a verified email), with **Everyone** as a filter, for
+   a sign-in table, lanyards, or a binder at the desk.
+3. **Returning players.** A profile with a linked email shows **Is this
+   you? → This is me** (`/players/[id]/verify`): a code goes to the
+   linked email, no QR needed. Profiles without one say to ask the host.
+4. **Edit page checklist:** Add email · Add first & last name · Add a
+   photo.
+
+QR codes are never shown on the public board or public pages: the first
+person to verify an email through a code claims that profile.
+
+## Levels and protests
+
+- Levels: Beginner, Novice, Intermediate, Advanced, Pro. New players start
+  at Beginner. Admins set levels on the profile, with an optional note.
+- Protests need a **signed-in player** (Sign in: email + 6-digit code)
+  who had a **confirmed (paid) spot in an open play with that player**.
+  Anonymous visitors and outside players can't file. Pick the level it
+  should be and say why. One pending protest per player.
+- The admin sees who filed it (name, email) and the open play they
+  shared. The public profile never shows who filed a protest.
+- `/admin/protests` lists pending protests with the player's record beside
+  each. Approve (moves the level) or reject, with a note the player sees.
+
+## Payments, check-in, and shared players
+
+- **Every payment is confirmed by a host by hand.** At the desk a pair is
+  registered "Pair · paid now" (entry recorded, receipts emailed) or
+  "Pair · pay later" (saved **UNPAID**, no receipt yet). Online sign-ups
+  are unpaid too. Unpaid pairs are marked with a rose **UNPAID** badge at
+  the desk ("Unpaid · confirm payment"), solos waiting for a partner are
+  marked unpaid, and the check-in list highlights unpaid pairs in rose.
+- **Check-in before queuing:** the first setup step is **Check-in**: every
+  pair (paid and unpaid) with a button per player; tap as they arrive.
+  A pair can be added to the queue only when it's **paid and both players
+  are checked in** ("✓ Ready"); the server refuses anything else. The
+  live dashboard's late-arrivals panel uses the same check-in list. The
+  desk's paid list shows "✓ Checked in" or "1/2 checked in".
+- **Players are shared across open plays and groups.** A player is one
+  record identified by email: registering someone (desk or online) with
+  an email already on a player links that player, keeping their name,
+  level, matches, and ranking, instead of making a new one. Hosts' desk
+  lists show only players from their own open plays (emails are
+  private); returning players from elsewhere are linked by typing their
+  email. Hosts can't change a player's confirmed email (admins can).

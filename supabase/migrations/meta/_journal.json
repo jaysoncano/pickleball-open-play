@@ -1,0 +1,125 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1793062288022,
+      "tag": "20261027005128_init",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793064027830,
+      "tag": "20261027012027_player_profiles",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793065809616,
+      "tag": "20261027015009_email_confirmed",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793067018756,
+      "tag": "20261027021018_pairs",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793067512802,
+      "tag": "20261027021832_first_last_name",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793067520839,
+      "tag": "20261027021840_drop_full_name",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793068914651,
+      "tag": "20261027024154_open_plays",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793068932510,
+      "tag": "20261027024212_open_plays_required",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793069986006,
+      "tag": "20261027025946_open_play_levels",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793069992626,
+      "tag": "20261027025952_drop_level_range",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793071610845,
+      "tag": "20261027032650_pair_payment_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793072499213,
+      "tag": "20261027034139_solo_requested_rank",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793073041831,
+      "tag": "20261027035041_protest_filed_by",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793073656036,
+      "tag": "20261027040056_usernames_passwords",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793074277325,
+      "tag": "20261027041117_account_roles_venues",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1793076132538,
+      "tag": "20261027044212_hosts_groups_checkin",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1793086886954,
+      "tag": "20261027074126_open_play_banners",
+      "breakpoints": true
+    }
+  ]
+}
