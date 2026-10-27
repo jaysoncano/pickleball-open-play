@@ -83,8 +83,9 @@ http://127.0.0.1:54324 (`MAILPIT_URL`), started by `npm run db:start`.
 
 ## Commands
 
-`npm run dev` (`scripts/dev.mjs`: starts Supabase if needed, Next on port
-1027 or the next free one, never 3000–3010, opens the app and Mailpit;
+`npm run dev` (`scripts/dev.mjs`: starts Supabase if needed, applies new
+migrations, Next on port 1027 or the next free one, never 3000–3010,
+opens the app, Mailpit, and Supabase Studio;
 `-- --no-open` skips the browser) · `npm run dev:next` (plain `next dev`) ·
 `npm run db:start` · `npm test` · `npm run coverage` (85%
 on `lib/`) · `npm run lint` · `npm run typecheck` · `npm run format:check` ·

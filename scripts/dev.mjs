@@ -1,7 +1,9 @@
-// `npm run dev`: start Supabase (database + Mailpit) if it isn't running,
-// run Next on port 1027 (or the next free one, never 3000–3010), then open
-// the app and the Mailpit inbox in the browser. `npm run dev -- --no-open`
-// skips the browser; `npm run dev:next` is plain `next dev`.
+// `npm run dev`: start Supabase (database, Studio, Mailpit) if it isn't
+// running and apply any new migrations (data is kept), run Next on port
+// 1027 (or the next free one, never 3000–3010), then open the app, the
+// Mailpit inbox, and Supabase Studio (browse tables) in the browser.
+// `npm run dev -- --no-open` skips the browser; `npm run dev:next` is
+// plain `next dev`.
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import net from "node:net";
@@ -12,6 +14,7 @@ const READY_TIMEOUT_MS = 90_000;
 
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 const mailpit = process.env.MAILPIT_URL ?? "http://127.0.0.1:54324";
+const studio = process.env.SUPABASE_STUDIO_URL ?? "http://127.0.0.1:54323";
 const openBrowser = !process.argv.includes("--no-open");
 
 /** Whether nothing is listening on `port` yet. */
@@ -33,12 +36,24 @@ async function pickPort() {
 
 function ensureSupabase() {
   const status = spawnSync("npx", ["supabase", "status"], { stdio: "ignore" });
-  if (status.status === 0) return;
-  console.log("▶ Starting Supabase (database + Mailpit)…");
-  const start = spawnSync("npx", ["supabase", "start"], { stdio: "inherit" });
-  if (start.status !== 0) {
-    console.error("✖ Supabase didn't start. Is Docker running?");
-    process.exit(start.status ?? 1);
+  if (status.status !== 0) {
+    console.log("▶ Starting Supabase (database, Studio, Mailpit)…");
+    const start = spawnSync("npx", ["supabase", "start"], {
+      stdio: "inherit",
+    });
+    if (start.status !== 0) {
+      console.error("✖ Supabase didn't start. Is Docker running?");
+      process.exit(start.status ?? 1);
+    }
+  }
+  // New migrations from a pull; a no-op when up to date. Keeps data.
+  const migrate = spawnSync("npx", ["supabase", "migration", "up"], {
+    encoding: "utf8",
+  });
+  if (migrate.status !== 0) {
+    console.warn("⚠ Couldn't apply migrations:\n" + migrate.stderr.trim());
+  } else if (/Applying migration/.test(migrate.stdout + migrate.stderr)) {
+    console.log("▶ Applied new database migrations");
   }
 }
 
@@ -71,6 +86,7 @@ const port = await pickPort();
 const app = `http://localhost:${port}`;
 console.log(`▶ App:     ${app}  (staff: ${app}/admin/login)`);
 console.log(`▶ Mailpit: ${mailpit}`);
+console.log(`▶ Studio:  ${studio}  (browse tables and data)`);
 
 const next = spawn("npx", ["next", "dev", "--port", String(port)], {
   stdio: "inherit",
@@ -83,4 +99,5 @@ process.on("SIGTERM", () => next.kill("SIGTERM"));
 if (openBrowser && (await waitForServer(app))) {
   open(app);
   open(mailpit);
+  open(studio);
 }
