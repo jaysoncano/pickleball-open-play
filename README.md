@@ -13,9 +13,9 @@ scores, player history, rankings, and skill levels players can protest.
 - **Public pages:** open plays, live court boards, player profiles, and
   group pages anyone can share.
 
-Built with Next.js 16 (App Router), React 19,
-Tailwind 4, Zod 4, and Drizzle ORM on Supabase Postgres, deployed to
-Cloudflare Workers with OpenNext.
+Built with Next.js 16 (App Router, Cache Components), React 19,
+Tailwind 4, Zod 4, and Drizzle ORM on Supabase Postgres, deployed on
+Vercel.
 
 ## Prerequisites
 
@@ -106,27 +106,22 @@ Cloudflare Workers with OpenNext.
 | `npx supabase migration up` | Apply new migrations without restarting (`npm run dev` does this too) |
 | `npm run db:reset`          | Wipe local data, re-run all migrations, load `supabase/seed.sql`      |
 | `npm run db:stop`           | Stop local Supabase                                                   |
-| `npm run preview`           | Cloudflare build, served locally by wrangler (reads `.dev.vars`)      |
-| `npm run deploy`            | Cloudflare build and deploy (needs `wrangler login`)                  |
 
-## Deploy (Cloudflare Workers)
+## Deploy (Vercel)
 
-The app runs on Cloudflare Workers through OpenNext (`wrangler.jsonc`,
-`open-next.config.ts`). Cloudflare's Git build runs `npm ci`, then
-`npx opennextjs-cloudflare build` and `npx opennextjs-cloudflare deploy`.
+Pushes to `main` deploy on Vercel (Hobby plan). Functions run in Mumbai
+(`bom1`, `vercel.json`), next to the Supabase database (`ap-south-1`).
 
 - **Database:** a hosted Supabase project. Use its pooler connection
   string (Connect → Transaction pooler, port 6543), then apply the
-  migrations: `npx supabase db push --db-url "<url>"`.
-- **Secrets** (Worker → Settings → Variables and secrets, or
-  `npx wrangler secret put <NAME>`): `DATABASE_URL`, `ADMIN_SECRET`,
-  `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `RESEND_API_KEY`. `EMAIL_FROM` and
-  `CURRENCY` are in `wrangler.jsonc`.
-- **Cache Components is off** (`next.config.ts`): on Workers it hangs every
-  request until opennextjs/opennextjs-cloudflare#1318 ships.
-- Keep `@opennextjs/cloudflare` and `wrangler` in `package.json`; without
-  them Cloudflare adds them during the build and `npm ci` fails on the
-  lock file.
+  migrations through the session port (5432):
+  `npx supabase db push --db-url "<url with :5432>"`.
+- **Environment variables** (Project → Settings → Environment Variables,
+  or `vercel env add <NAME> production`): `DATABASE_URL`, `ADMIN_SECRET`,
+  `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `RESEND_API_KEY`, `EMAIL_FROM`,
+  `CURRENCY`, `OPEN_PLAY_FEE`.
+- The first sign-in at `/admin/login` with `ADMIN_USERNAME` /
+  `ADMIN_PASSWORD` creates the first admin on an empty database.
 
 ## Troubleshooting
 

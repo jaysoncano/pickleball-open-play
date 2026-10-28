@@ -1,10 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Off: on Cloudflare Workers (OpenNext) Cache Components hangs every
-  // request. Turn back on with partialPrefetching once
-  // opennextjs/opennextjs-cloudflare#1318 ships.
-  cacheComponents: false,
+  cacheComponents: true,
   // Hosts and Venue & banner moved into one Manage page.
   async redirects() {
     return [
@@ -20,7 +17,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  partialPrefetching: false,
+  partialPrefetching: true,
   experimental: {
     // A banner and a group logo can ride along with the New open play form.
     serverActions: { bodySizeLimit: "2mb" },

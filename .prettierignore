@@ -5,6 +5,4 @@ package-lock.json
 next-env.d.ts
 supabase/migrations/meta
 .temp
-.open-next
-.wrangler
 .agents
