@@ -4,7 +4,7 @@
 
 Open-play court queue for pickleball with a database: recorded matches,
 player history, and skill levels players can protest. Built from Paddle
-Stack Queuing. Next.js 16 App Router (Cache Components), React 19,
+Stack Queuing. Next.js 16 App Router (Cache Components off, see `next.config.ts`), React 19,
 Tailwind 4, Zod 4, Drizzle ORM on Supabase Postgres (local via
 `supabase start`). No `src/` folder.
 
@@ -78,7 +78,9 @@ Tailwind 4, Zod 4, Drizzle ORM on Supabase Postgres (local via
 - Email and phone are private: never render them on public pages (masked
   hints show the first letter only: `maskEmail`). QR
   codes (claim tokens) are admin-only: never on public pages or the board.
-- DB/cookie reads in pages go inside `<Suspense>` (Cache Components).
+- DB/cookie reads in pages go inside `<Suspense>` (ready for Cache Components).
+- Deploys to Cloudflare Workers via OpenNext. `getDb()` is per request
+  (`cache()`): Workers can't share a connection across requests.
 - Engine functions take `now` and `rng` as arguments.
 - Destructive buttons use `ConfirmButton` (two taps), never `confirm()`.
   Saves that change or replace data use `ConfirmSubmit` (two taps, checks
@@ -107,4 +109,5 @@ opens the app, Mailpit, and Supabase Studio;
 `-- --no-open` skips the browser) · `npm run dev:next` (plain `next dev`) ·
 `npm run db:start` · `npm test` · `npm run coverage` (85%
 on `lib/`) · `npm run lint` · `npm run typecheck` · `npm run format:check` ·
-`npm run build` · `npm run db:generate` · `npm run db:reset`
+`npm run build` · `npm run preview` / `npm run deploy` (Cloudflare) ·
+`npm run db:generate` · `npm run db:reset`

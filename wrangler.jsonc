@@ -1,0 +1,26 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Must match the Worker's name in the Cloudflare dashboard.
+  "name": "pickleball-open-play",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-10-20",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS",
+  },
+  "services": [
+    {
+      // Self-reference, see https://opennext.js.org/cloudflare/caching
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "pickleball-open-play",
+    },
+  ],
+  // Secrets (DATABASE_URL, ADMIN_SECRET, RESEND_API_KEY): set them in the
+  // dashboard or with `npx wrangler secret put <NAME>`; locally, .dev.vars.
+  "vars": {
+    "EMAIL_FROM": "POP <onboarding@resend.dev>",
+    "CURRENCY": "PHP",
+  },
+  "observability": { "enabled": true },
+}
