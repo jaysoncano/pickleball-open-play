@@ -38,7 +38,7 @@ async function Verify({
     return (
       <p className="mt-4 text-ink/70">
         Nothing to verify here.{" "}
-        <Link href="/admin/login" className="font-semibold text-fuchsia-600">
+        <Link href="/host/login" className="font-semibold text-fuchsia-600">
           Sign in
         </Link>{" "}
         to get a new code.

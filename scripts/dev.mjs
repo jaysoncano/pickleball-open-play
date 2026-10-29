@@ -84,7 +84,9 @@ function open(url) {
 ensureSupabase();
 const port = await pickPort();
 const app = `http://localhost:${port}`;
-console.log(`▶ App:     ${app}  (staff: ${app}/admin/login)`);
+console.log(
+  `▶ App:     ${app}  (hosts: ${app}/host/login, admins: ${app}/admin/login)`,
+);
 console.log(`▶ Mailpit: ${mailpit}`);
 console.log(`▶ Studio:  ${studio}  (browse tables and data)`);
 

@@ -59,7 +59,7 @@ export default function ManagePage({ params }: Props) {
 async function Manage({ params }: Pick<Props, "params">) {
   const { id } = await params;
   const me = await currentAdmin();
-  if (!me) redirect("/admin/login");
+  if (!me) redirect("/host/login");
   const db = getDb();
   const play = await getOpenPlay(db, id);
   if (!play) notFound();

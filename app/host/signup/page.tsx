@@ -32,7 +32,7 @@ export default function HostSignupPage({
         <p className="mt-4 text-center text-sm text-ink/60">
           Already a host?{" "}
           <Link
-            href="/admin/login"
+            href="/host/login"
             className="font-semibold text-fuchsia-600 hover:underline"
           >
             Sign in

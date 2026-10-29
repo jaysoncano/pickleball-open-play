@@ -42,7 +42,7 @@ const joined = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 
 async function Settings() {
   const me = await currentAdmin();
-  if (!me) redirect("/admin/login");
+  if (!me) redirect("/host/login");
   const db = getDb();
   const [admins, account] = await Promise.all([
     me.role === "admin" ? listAdmins(db) : [],

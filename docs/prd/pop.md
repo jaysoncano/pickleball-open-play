@@ -7,8 +7,13 @@ protests their skill level.
 
 ## Users
 
-- **Staff accounts** sign in at `/admin/login` ("Staff") with a
-  **username and password**. The first account comes from
+- **Staff accounts** sign in with a **username and password**, each
+  level at its own door: **hosts** at `/host/login` (the "Host" nav
+  link); **admins** at `/admin/login` (the "Admin" nav link, also linked
+  from the host sign-in; search engines don't index it). Each door turns away the other level with the
+  same "wrong username or password". Admin-only pages (protests, QR
+  codes) answer 404 to anyone else instead of pointing at the sign-in. On phones the nav links fold behind a **Menu**
+  button. The first account comes from
   `ADMIN_USERNAME`/`ADMIN_PASSWORD` and is an admin. Each account has a
   **level**:
   - **Admin:** everything. Every open play (home "Mine / All" toggle),
@@ -22,7 +27,7 @@ protests their skill level.
     account management. Settings: change their own password.
   - Any account: Settings → change your password (signs out your other
     devices).
-- **Host self sign-up** (`/host/signup`, linked from the Staff sign-in
+- **Host self sign-up** (`/host/signup`, linked from the Host sign-in
   and the public home): group name, email, username, password → a
   6-digit code is emailed → `/host/verify` → the account opens and signs
   in. Until verified the account can't sign in (signing in sends a new

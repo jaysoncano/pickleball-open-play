@@ -72,8 +72,8 @@ Vercel.
 
 4. **Sign in as the first admin**
 
-   Go to `/admin/login` (the **Staff** link) and sign in with `admin` and
-   your `ADMIN_PASSWORD`. While no account exists, that sign-in creates
+   Go to `/admin/login` (the **Admin** link) and sign in
+   with `admin` and your `ADMIN_PASSWORD`. While no account exists, that sign-in creates
    the admin. Add more staff and change passwords under **Settings**.
 
 5. **Schedule your first open play**
@@ -121,7 +121,8 @@ Pushes to `main` deploy on Vercel (Hobby plan). Functions run in Mumbai
   `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `RESEND_API_KEY`, `EMAIL_FROM`,
   `CURRENCY`, `OPEN_PLAY_FEE`.
 - The first sign-in at `/admin/login` with `ADMIN_USERNAME` /
-  `ADMIN_PASSWORD` creates the first admin on an empty database.
+  `ADMIN_PASSWORD` creates the first admin on an empty database. Hosts
+  sign in at `/host/login`; admin accounts only work at `/admin/login`.
 
 ## Troubleshooting
 
