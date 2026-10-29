@@ -34,7 +34,8 @@ Tailwind 4, Zod 4, Drizzle ORM on Supabase Postgres (local via
   (schedule one; saving opens its Manage page),
   `/open-plays/[id]` (its hosts: setup/dashboard; others: public board),
   `/open-plays/[id]/manage` (its hosts: edit date/ranks/cap/fee, venue,
-  banner, hosts; only the main host invites; image at `/banners/[id]`;
+  banner, hosts table; only the main host invites or creates a co-host
+  account (`createCoHostAccount`); image at `/banners/[id]`;
   old `/details` and `/hosts` redirect here),
   `/host/signup` + `/host/verify` (host self sign-up, email code),
   `/groups/[id]` (public group page) + `/groups/[id]/logo`, `/players`, `/players/[id]`,
@@ -44,7 +45,10 @@ Tailwind 4, Zod 4, Drizzle ORM on Supabase Postgres (local via
   redirecting there), `/admin/protests`,
   `/admin/qr-codes`, `/admin/players` (Player desk: pick an open play, then one screen:
   register tabs left, filterable pairs table right; `lib/registration/desk.ts`),
-  `/admin/settings` (accounts and levels, password), `/login` (players).
+  `/admin/settings` (tabs: Group, Account, Accounts (admins: all; hosts:
+  ones they made, `admins.created_by`), admins also Add account; `?tab=`;
+  creators can show the password they set: `start_password`, sealed with
+  ADMIN_SECRET, cleared when the account changes it), `/login` (players).
   Host dashboard
   tabs: Courts, Profiles (check-in QR), History, Standings.
 - Docs: `docs/prd/pop.md`, `docs/specs/data-model.md`,
@@ -61,7 +65,9 @@ Tailwind 4, Zod 4, Drizzle ORM on Supabase Postgres (local via
   `requireOpenPlay(id)` (admin, creator, or invited host); choosing hosts
   (invite, remove) checks `requireMainHost(id)` (creator or admin, `canInvite`);
   club-wide ones
-  (protests, levels, QR codes page, accounts) check `requireAdmin()`.
+  (levels, QR codes page, adding admins) check `requireAdmin()`.
+  Protests: hosts decide those about their players (`staffFor`), admins
+  any, plus set rank and remove (`requireAdmin`).
   Lists for staff filter with `managedBy` unless an admin picks "All".
 - Every other server action that changes data checks `requireAdmin()`, except
   `fileProtest` (signed-in player who shared an open play) and

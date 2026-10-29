@@ -4,10 +4,12 @@ import {
   adminToken,
   hashPassword,
   isBootstrapLogin,
+  openPassword,
   NewPasswordSchema,
   PasswordSchema,
   passwordVersion,
   readAdminToken,
+  sealPassword,
   UsernameSchema,
   verifyPassword,
   HostSignupSchema,
@@ -124,5 +126,27 @@ describe("HostSignupSchema", () => {
     expect(HostSignupSchema.safeParse(input).error?.issues[0].message).toBe(
       message,
     );
+  });
+});
+
+describe("starting passwords", () => {
+  it("seals and opens with the same secret", () => {
+    const sealed = sealPassword("s3cret", "pop-host-123");
+    expect(sealed).not.toContain("pop-host-123");
+    expect(sealed.startsWith("v1.")).toBe(true);
+    expect(openPassword("s3cret", sealed)).toBe("pop-host-123");
+    // A fresh IV each time.
+    expect(sealPassword("s3cret", "pop-host-123")).not.toBe(sealed);
+  });
+
+  it("gives null for another secret, tampering, or junk", () => {
+    const sealed = sealPassword("s3cret", "pw");
+    expect(openPassword("other", sealed)).toBeNull();
+    const [v, iv, tag, data] = sealed.split(".");
+    expect(
+      openPassword("s3cret", [v, iv, tag, data + "A"].join(".")),
+    ).toBeNull();
+    expect(openPassword("s3cret", "v2.a.b.c")).toBeNull();
+    expect(openPassword("s3cret", "junk")).toBeNull();
   });
 });

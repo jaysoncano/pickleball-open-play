@@ -1,17 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { resolveProtest } from "@/app/actions";
+import { RemoveProtest } from "@/components/players/remove-protest";
+import { ChangeLevelForm } from "@/components/players/change-level-form";
 import { LevelBadge } from "@/components/level-badge";
 import { Loading } from "@/components/loading";
 import { ProtestList } from "@/components/players/protest-list";
 import { RecordCard } from "@/components/players/record-card";
-import { isAdmin } from "@/lib/auth-server";
+import { currentAdmin } from "@/lib/auth-server";
 import { getDb } from "@/lib/db/client";
 import {
   getOpenPlay,
   listProtests,
+  managedPlayerIds,
   playerMatches,
   sharedOpenPlay,
   type OpenPlay,
@@ -39,7 +42,9 @@ export default function ProtestsPage() {
         </h1>
         <p className="text-ink/60">
           Check each player&apos;s record, then approve to move them or reject
-          with a note. Every decision is kept on their profile.
+          with a note. Hosts decide protests about players of their open plays;
+          admins see every one, can change a rank directly, and remove protests.
+          Every decision is kept on their profile.
         </p>
       </header>
       <Suspense fallback={<Loading />}>
@@ -50,9 +55,15 @@ export default function ProtestsPage() {
 }
 
 async function Protests() {
-  if (!(await isAdmin())) notFound(); // Admin pages stay hidden.
+  const me = await currentAdmin();
+  if (!me) redirect("/host/login");
+  const admin = me.role === "admin";
   const db = getDb();
-  const all = await listProtests(db);
+  // Hosts: protests about players of their open plays. Admins: all.
+  const all = await listProtests(
+    db,
+    admin ? {} : { playerIds: await managedPlayerIds(db, me.id) },
+  );
   const pending = all.filter((p) => p.status === "pending");
   const resolved = all.filter((p) => p.status !== "pending").slice(0, 20);
   const records = new Map(
@@ -91,7 +102,9 @@ async function Protests() {
     <>
       {pending.length === 0 ? (
         <p className={`${CARD} text-center text-ink/50`}>
-          No protests waiting. 🎉
+          {admin
+            ? "No protests waiting. 🎉"
+            : "No protests about your players waiting. 🎉"}
         </p>
       ) : (
         <ol className="flex flex-col gap-5">
@@ -115,7 +128,7 @@ async function Protests() {
               </p>
               <FiledBy
                 name={p.filedByName}
-                email={p.filedByEmail}
+                email={admin ? p.filedByEmail : null}
                 id={p.filedById}
                 shared={shared.get(p.id) ?? null}
               />
@@ -151,6 +164,21 @@ async function Protests() {
                   Reject
                 </ConfirmSubmit>
               </form>
+              {admin && (
+                <div className="flex flex-col gap-3 rounded-2xl bg-violet-50 p-3 ring-2 ring-violet-100">
+                  <p className="text-sm font-bold text-violet-900">
+                    Admin: set {p.playerName}&apos;s rank directly, or remove
+                    this protest
+                  </p>
+                  <ChangeLevelForm
+                    playerId={p.playerId}
+                    level={p.playerLevel}
+                  />
+                  <div className="flex justify-end">
+                    <RemoveProtest id={p.id} name={p.playerName} />
+                  </div>
+                </div>
+              )}
             </li>
           ))}
         </ol>
@@ -161,7 +189,14 @@ async function Protests() {
           <h2 id="resolved-title" className="font-display text-2xl font-bold">
             Recently decided
           </h2>
-          <ProtestList protests={resolved} />
+          <ProtestList
+            protests={resolved}
+            action={
+              admin
+                ? (p) => <RemoveProtest id={p.id} name={p.playerName} />
+                : undefined
+            }
+          />
         </section>
       )}
     </>

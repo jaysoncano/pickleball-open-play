@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { LevelBadge } from "@/components/level-badge";
 import type { ProtestStatus } from "@/lib/ranking/forms";
 import type { Level } from "@/lib/ranking/levels";
@@ -18,10 +19,19 @@ export type ProtestRow = {
   status: ProtestStatus;
   adminNote: string;
   createdAt: Date;
+  /** The host or admin who decided it (staff pages only). */
+  resolvedByName?: string | null;
 };
 
 /** Past and pending protests for one player. */
-export function ProtestList({ protests }: { protests: ProtestRow[] }) {
+export function ProtestList<P extends ProtestRow>({
+  protests,
+  action,
+}: {
+  protests: P[];
+  /** Per protest, e.g. an admin's Remove. */
+  action?: (protest: P) => ReactNode;
+}) {
   if (protests.length === 0) return null;
   return (
     <ol className="mt-4 flex flex-col gap-2 border-t border-ink/5 pt-4">
@@ -42,9 +52,15 @@ export function ProtestList({ protests }: { protests: ProtestRow[] }) {
           <p className="mt-1 text-ink/70">“{p.reason}”</p>
           {p.adminNote && (
             <p className="mt-1 font-semibold text-ink/55">
-              Admin: {p.adminNote}
+              Note: {p.adminNote}
             </p>
           )}
+          {p.resolvedByName && (
+            <p className="mt-1 text-xs font-semibold text-ink/45">
+              Decided by {p.resolvedByName}
+            </p>
+          )}
+          {action && <div className="mt-2 flex justify-end">{action(p)}</div>}
         </li>
       ))}
     </ol>
