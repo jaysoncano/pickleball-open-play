@@ -31,7 +31,8 @@ async function OpenPlays() {
     listOpenPlays(getDb(), { from: sinceYesterday() }),
   ]);
   const live = plays.filter((p) => p.live);
-  const upcoming = plays.filter((p) => !p.live);
+  // Ended ones show their results on their page, not in this list.
+  const upcoming = plays.filter((p) => !p.live && !p.ended);
 
   return (
     <>

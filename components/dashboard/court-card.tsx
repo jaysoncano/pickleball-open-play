@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { courtTheme } from "@/components/court-theme";
 import { Avatar } from "@/components/ui/avatar";
 import { ConfirmButton } from "@/components/ui/confirm-button";
@@ -134,10 +135,8 @@ export function CourtCard({
           {canClose && !locked && (
             <ConfirmButton
               label={`Close ${court.label}`}
-              confirmLabel="Close?"
               onConfirm={onClose}
               className="size-9 text-ink/40 hover:bg-white hover:text-rose-600"
-              armedClassName="h-9 text-sm"
             >
               ✕
             </ConfirmButton>
@@ -145,42 +144,49 @@ export function CourtCard({
         </div>
       </div>
 
+      {/* Side A over side B, each pair on its own full-width row. */}
       <div
-        className={`relative grid flex-1 grid-cols-2 gap-3 rounded-3xl p-3 sm:gap-4 ${theme.surface}`}
+        className={`relative flex flex-1 flex-col justify-center gap-2 rounded-3xl p-3 ${theme.surface}`}
       >
         <span
           aria-hidden
           className="pointer-events-none absolute inset-1.5 rounded-[1.25rem] border-2 border-white/70"
         />
-        <span
-          aria-hidden
-          className="pointer-events-none absolute inset-y-1.5 left-1/2 w-1 -translate-x-1/2 rounded-full bg-white"
-        />
         {sides.map((side, s) => (
-          <ul
-            key={s}
-            aria-label={s === 0 ? "Side A" : "Side B"}
-            className="relative flex flex-col justify-center gap-2"
-          >
-            {side.map((pid, i) =>
-              pid ? (
-                <SeatedPlayer
-                  key={pid}
-                  name={players[pid].name}
-                  locked={locked}
-                  onSwap={() => onSwap(pid)}
-                  onRemove={() => onRemovePlayer(pid)}
-                />
-              ) : (
-                <li
-                  key={`open-${i}`}
-                  className="flex min-h-11 items-center justify-center rounded-full border-2 border-dashed border-white/80 text-sm font-semibold text-white"
-                >
-                  Open
-                </li>
-              ),
+          <Fragment key={s}>
+            {s === 1 && (
+              <div aria-hidden className="relative flex items-center gap-2">
+                <span className="h-1 flex-1 rounded-full bg-white" />
+                <span className="rounded-full bg-white px-2.5 py-0.5 font-display text-xs font-black text-ink/60">
+                  VS
+                </span>
+                <span className="h-1 flex-1 rounded-full bg-white" />
+              </div>
             )}
-          </ul>
+            <ul
+              aria-label={s === 0 ? "Side A" : "Side B"}
+              className="relative flex flex-col gap-2"
+            >
+              {side.map((pid, i) =>
+                pid ? (
+                  <SeatedPlayer
+                    key={pid}
+                    name={players[pid].name}
+                    locked={locked}
+                    onSwap={() => onSwap(pid)}
+                    onRemove={() => onRemovePlayer(pid)}
+                  />
+                ) : (
+                  <li
+                    key={`open-${i}`}
+                    className="flex min-h-12 items-center justify-center rounded-2xl border-2 border-dashed border-white/80 text-sm font-semibold text-white"
+                  >
+                    Open
+                  </li>
+                ),
+              )}
+            </ul>
+          </Fragment>
         ))}
       </div>
 
@@ -246,10 +252,9 @@ export function CourtCard({
             </button>
             <ConfirmButton
               label={`Cancel the game on ${court.label}`}
-              confirmLabel="Cancel it?"
+              confirmText="Cancel game"
               onConfirm={onCancel}
               className={`${SECONDARY} w-full hover:text-rose-600`}
-              armedClassName="min-h-11 rounded-2xl text-sm"
             >
               ✕ Cancel
             </ConfirmButton>
@@ -272,6 +277,7 @@ export function CourtCard({
   );
 }
 
+/** A pair on court: both players side by side, names in full. */
 function SeatedPlayer({
   name,
   locked,
@@ -283,50 +289,46 @@ function SeatedPlayer({
   onSwap: () => void;
   onRemove: () => void;
 }) {
-  const showSwap = !locked;
+  // Pairs are named "Ana & Ben"; show each player with their own avatar.
+  const people = name.split(" & ");
   return (
-    <li className="animate-pop-in flex min-h-11 min-w-0 items-center gap-1.5 rounded-full bg-white py-1 pr-1 pl-1 shadow-sm motion-reduce:animate-none">
-      {/* Make room for both edit buttons on narrow phones. */}
-      <Avatar
-        name={name}
-        size="sm"
-        className={showSwap ? "max-sm:hidden" : ""}
-      />
-      <span
-        className={`min-w-0 flex-1 truncate text-sm font-bold ${showSwap ? "max-sm:pl-2" : ""}`}
-      >
-        {name}
+    <li className="animate-pop-in flex min-h-12 items-center gap-2 rounded-2xl bg-white py-1.5 pr-1.5 pl-2 shadow-sm motion-reduce:animate-none">
+      <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
+        {people.map((person, i) => (
+          <span key={i} className="flex min-w-0 items-center gap-1.5">
+            <Avatar name={person} size="sm" />
+            <span className="font-display text-base font-bold break-words">
+              {person}
+            </span>
+          </span>
+        ))}
       </span>
       {locked ? (
         <span
           title="Locked while playing"
-          className="flex size-7 shrink-0 items-center justify-center text-xs opacity-40"
+          className="flex size-8 shrink-0 items-center justify-center text-xs opacity-40"
         >
           <span aria-hidden>🔒</span>
           <span className="sr-only">Locked while playing</span>
         </span>
       ) : (
-        <>
-          {showSwap && (
-            <button
-              type="button"
-              aria-label={`Swap ${name} with another player`}
-              onClick={onSwap}
-              className="relative flex size-7 shrink-0 items-center justify-center rounded-full text-sm font-bold text-sky-500 after:absolute after:-inset-1 hover:bg-sky-100 hover:text-sky-700"
-            >
-              ⇄
-            </button>
-          )}
+        <span className="flex shrink-0 items-center">
+          <button
+            type="button"
+            aria-label={`Swap ${name} with another pair`}
+            onClick={onSwap}
+            className="relative flex size-8 items-center justify-center rounded-full text-base font-bold text-sky-500 after:absolute after:-inset-1 hover:bg-sky-100 hover:text-sky-700"
+          >
+            ⇄
+          </button>
           <ConfirmButton
             label={`Remove ${name}`}
-            confirmLabel="Out?"
             onConfirm={onRemove}
-            className="size-7 shrink-0 text-ink/35 hover:bg-rose-100 hover:text-rose-600"
-            armedClassName="h-7 text-xs"
+            className="size-8 text-ink/35 hover:bg-rose-100 hover:text-rose-600"
           >
             ×
           </ConfirmButton>
-        </>
+        </span>
       )}
     </li>
   );

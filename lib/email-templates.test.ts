@@ -36,7 +36,7 @@ describe("receiptEmail", () => {
     rank: "Novice – Intermediate",
     venue: "Sunrise Courts · Makati",
     partner: "Ben <b>",
-    entry: { amount: "₱300.00", method: "E-wallet", reference: "GC-77" },
+    entry: { amount: "₱300.00", method: "E-wallet" },
     receiptNo: "AB12CD34",
     profileLink: "https://pop.app/confirm/t?x=1&y=2",
   };
@@ -51,21 +51,13 @@ describe("receiptEmail", () => {
     expect(mail.text).toContain("Rank: Novice – Intermediate");
     expect(mail.text).toContain("Venue: Sunrise Courts · Makati");
     expect(mail.text).toContain("Entry for the pair: ₱300.00");
-    expect(mail.text).toContain("Reference: GC-77");
+    expect(mail.text).toContain("Paid by: E-wallet");
     expect(mail.text).toContain("https://pop.app/confirm/t?x=1&y=2");
     expect(mail.html).toContain("You&#39;re in, Ana!");
     expect(mail.html).toContain("Paid in full");
     expect(mail.html).toContain("Ben &lt;b&gt;");
     expect(mail.html).toContain('href="https://pop.app/confirm/t?x=1&amp;y=2"');
     expect(mail.html).toContain("Confirm email &amp; update profile");
-  });
-
-  it("leaves out an empty reference", () => {
-    const mail = receiptEmail({
-      ...base,
-      entry: { ...base.entry!, reference: "" },
-    });
-    expect(mail.text).not.toContain("Reference");
   });
 
   it("leaves out a missing venue", () => {

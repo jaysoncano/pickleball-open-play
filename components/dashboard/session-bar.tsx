@@ -59,10 +59,10 @@ export function SessionBar({
           </Button>
           <ConfirmButton
             label="End session"
-            confirmLabel="End it?"
+            warning="The open play closes and shows its results: the top pairs, everyone ranked, and every game. It can't be started again."
+            confirmText="End session"
             onConfirm={onEnd}
             className="min-h-11 px-4 text-ink/60 hover:bg-rose-50 hover:text-rose-600"
-            armedClassName="min-h-11"
           >
             End session
           </ConfirmButton>

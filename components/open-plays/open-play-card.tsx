@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { OpenPlay } from "@/lib/db/queries";
+import { formatMoney, openPlayFee } from "@/lib/registration/forms";
 import { ranksLabel, spotsLeft, whenLabel } from "@/lib/registration/open-play";
 import { LEVEL_INFO, LEVELS } from "@/lib/ranking/levels";
 import { initials } from "@/lib/banner";
@@ -163,7 +164,11 @@ export function OpenPlayCard({
         <span className="rounded-full bg-white/90 px-2 py-1 shadow-sm backdrop-blur">
           <RankChip play={play} />
         </span>
-        {play.live ? (
+        {play.ended ? (
+          <span className="rounded-full bg-ink/80 px-3 py-1 text-sm font-bold text-white shadow-sm">
+            🏁 Ended · results
+          </span>
+        ) : play.live ? (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-500 px-3 py-1 text-sm font-bold text-white shadow-sm">
             <span
               aria-hidden
@@ -193,6 +198,11 @@ export function OpenPlayCard({
           </span>
         </Link>
         <PlayVenue play={play} />
+        {play.feeCents > 0 && (
+          <p className="font-display font-bold text-fuchsia-700">
+            Entry {formatMoney(play.feeCents, openPlayFee().currency)} per pair
+          </p>
+        )}
         <p className="text-sm font-semibold text-ink/60">
           <span className="tabular-nums">{play.pairCount}</span> pair
           {play.pairCount === 1 ? "" : "s"} signed up

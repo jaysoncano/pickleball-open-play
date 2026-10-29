@@ -35,6 +35,7 @@ let db: Db;
 let boss: string;
 
 const play: OpenPlayInput = {
+  kind: "ranked",
   venue: "Sunrise Courts",
   location: "Makati",
   playDate: "2026-10-27",

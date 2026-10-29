@@ -147,7 +147,7 @@ export type Receipt = {
   /** Partner's name; absent when signed up alone. */
   partner?: string;
   /** The pair's entry, paid in full; absent when signed up alone. */
-  entry?: { amount: string; method: string; reference: string };
+  entry?: { amount: string; method: string };
   receiptNo: string;
   /**
    * One-tap link that confirms the email and opens the profile. Only for
@@ -168,7 +168,6 @@ export function receiptEmail(r: Receipt): Email {
       ? ([
           ["Entry for the pair", paid.amount],
           ["Paid by", paid.method],
-          ...(paid.reference ? [["Reference", paid.reference]] : []),
         ] as [string, string][])
       : []),
     ["Receipt no.", r.receiptNo],

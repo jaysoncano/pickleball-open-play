@@ -29,6 +29,7 @@ let hana: string;
 let ivan: string;
 
 const play = (over: Partial<OpenPlayInput> = {}): OpenPlayInput => ({
+  kind: "ranked",
   venue: "Sunrise Courts",
   location: "Makati",
   playDate: "2026-10-27",

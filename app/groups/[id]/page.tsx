@@ -50,9 +50,11 @@ async function GroupProfile({ params }: Pick<Props, "params">) {
 
   const since = sinceYesterday();
   const live = plays.filter((p) => p.live);
-  const upcoming = plays.filter((p) => !p.live && p.playDate >= since);
+  const upcoming = plays.filter(
+    (p) => !p.live && !p.ended && p.playDate >= since,
+  );
   const past = plays
-    .filter((p) => !p.live && p.playDate < since)
+    .filter((p) => !p.live && (p.ended || p.playDate < since))
     .reverse()
     .slice(0, PAST);
   const venues = [...new Set(plays.map((p) => p.venue).filter(Boolean))];

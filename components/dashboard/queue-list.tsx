@@ -289,10 +289,8 @@ function QueueItem({
           </MoveButton>
           <ConfirmButton
             label={`Remove ${player.name}`}
-            confirmLabel="Remove?"
             onConfirm={() => onRemove(id)}
             className="size-9 text-ink/40 hover:bg-rose-100 hover:text-rose-600"
-            armedClassName="h-9 text-sm"
           >
             ×
           </ConfirmButton>

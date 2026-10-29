@@ -130,13 +130,14 @@ export async function staffFor(
 }
 
 /**
- * Who may edit this player's info: staff for the player (`staffFor`), or
- * the player after verifying their email. Null when neither.
+ * Who may edit this player's whole profile: an admin, or the player after
+ * verifying their email. Null when neither. Hosts only change the names
+ * a player registered with (`saveRegistrationName`).
  */
 export async function profileEditor(
   playerId: string,
 ): Promise<{ admin: true } | { admin: false; email: string } | null> {
-  if (await staffFor(await currentAdmin(), playerId)) return { admin: true };
+  if ((await currentAdmin())?.role === "admin") return { admin: true };
   const session = await currentPlayer();
   return session?.playerId === playerId
     ? { admin: false, email: session.email }

@@ -8,9 +8,11 @@ import {
   inArray,
   isNull,
   ne,
+  notInArray,
   or,
   sql,
   type ExtractTablesWithRelations,
+  type SQL,
 } from "drizzle-orm";
 import {
   alias,
@@ -49,13 +51,17 @@ import {
   type Member,
   type OpenPlayEdit,
   type OpenPlayInput,
+  type OpenPlayKind,
 } from "@/lib/registration/open-play";
 import {
   pairLevel,
   pairName,
   type ConfirmPayment,
+  type GuestPair,
+  type GuestSolo,
   type PairRegistration,
   type PairUp,
+  type RegistrationName,
   type UnpaidPair,
   type PublicSignup,
   type PublicSolo,
@@ -114,6 +120,14 @@ export type PlayerSummary = PlayerRow & {
 };
 
 /** Every player with games and wins, by name. */
+/** The real (not guest) player going by this name, any case. */
+function realNamed(name: string) {
+  return and(
+    sql`lower(${players.name}) = ${nameKey(name)}`,
+    eq(players.guest, false),
+  );
+}
+
 export async function listPlayers(db: Db): Promise<PlayerSummary[]> {
   const rows = await db
     .select({
@@ -128,6 +142,8 @@ export async function listPlayers(db: Db): Promise<PlayerSummary[]> {
     .from(players)
     .leftJoin(matchPlayers, eq(matchPlayers.playerId, players.id))
     .leftJoin(matches, eq(matches.id, matchPlayers.matchId))
+    // Regular open plays' guests have no shared record.
+    .where(eq(players.guest, false))
     .groupBy(players.id)
     .orderBy(asc(sql`lower(${players.name})`));
   return rows;
@@ -164,7 +180,8 @@ export async function getPlayer(
       createdAt: players.createdAt,
     })
     .from(players)
-    .where(eq(players.id, id));
+    // Guests (Regular open plays) have no profile.
+    .where(and(eq(players.id, id), eq(players.guest, false)));
   return row ?? null;
 }
 
@@ -187,7 +204,12 @@ export async function ensurePlayers(
     db
       .select({ id: players.id, name: players.name, level: players.level })
       .from(players)
-      .where(inArray(sql`lower(${players.name})`, keys));
+      .where(
+        and(
+          inArray(sql`lower(${players.name})`, keys),
+          eq(players.guest, false),
+        ),
+      );
 
   const existing = new Set((await find()).map((p) => nameKey(p.name)));
   const missing = keys.filter((k) => !existing.has(k));
@@ -210,12 +232,39 @@ export async function renamePlayer(
   const [taken] = await db
     .select({ id: players.id })
     .from(players)
-    .where(sql`lower(${players.name}) = ${nameKey(name)}`);
+    .where(realNamed(name));
   if (taken && taken.id !== id) return `${name} is already registered`;
   const rows = await db
     .update(players)
     .set({ name: name.trim() })
     .where(eq(players.id, id))
+    .returning({ id: players.id });
+  return rows.length ? null : "Player not found";
+}
+
+/**
+ * Change the names a player registered with: queue name, first and last.
+ * Returns an error, or null when saved.
+ */
+export async function setRegistrationName(
+  db: Db,
+  input: RegistrationName,
+): Promise<string | null> {
+  const [taken] = await db
+    .select({ id: players.id })
+    .from(players)
+    .where(realNamed(input.name));
+  if (taken && taken.id !== input.playerId) {
+    return `${input.name} is already registered`;
+  }
+  const rows = await db
+    .update(players)
+    .set({
+      name: input.name,
+      firstName: input.firstName,
+      lastName: input.lastName,
+    })
+    .where(eq(players.id, input.playerId))
     .returning({ id: players.id });
   return rows.length ? null : "Player not found";
 }
@@ -339,7 +388,9 @@ export async function listClaimTokens(
       photoUpdatedAt: players.photoUpdatedAt,
     })
     .from(players)
-    .where(ids ? inArray(players.id, ids) : undefined)
+    .where(
+      and(eq(players.guest, false), ids ? inArray(players.id, ids) : undefined),
+    )
     .orderBy(asc(sql`lower(${players.name})`));
 }
 
@@ -564,16 +615,21 @@ export type OpenPlay = {
   levels: Level[];
   maxPairs: number | null;
   feeCents: number;
+  /** Regular (names only, stats stay here) or Ranked (shared record). */
+  kind: OpenPlayKind;
   /** Paid pairs so far (pending sign-ups don't count). */
   pairCount: number;
   /** A session is running for it now. */
   live: boolean;
+  /** Its session ran and ended: it shows results, not in the lists. */
+  ended: boolean;
 };
 
 // Fully qualified: Drizzle renders columns unqualified inside sql``, which
 // would compare the subquery's own columns.
 const pairCountSql = sql<number>`(select count(*)::int from "pairs" p where p."open_play_id" = "open_plays"."id" and p."status" = 'paid')`;
 const liveSql = sql<boolean>`exists (select 1 from "sessions" s where s."open_play_id" = "open_plays"."id" and s."status" = 'active')`;
+const endedSql = sql<boolean>`exists (select 1 from "sessions" s where s."open_play_id" = "open_plays"."id" and s."status" = 'ended') and not exists (select 1 from "sessions" s where s."open_play_id" = "open_plays"."id" and s."status" = 'active')`;
 
 const groupNameSql = sql<string>`coalesce((select a."group_name" from "admins" a where a."id" = "open_plays"."created_by"), '')`;
 const groupLogoSql =
@@ -595,13 +651,16 @@ const openPlayFields = {
   levels: openPlays.levels,
   maxPairs: openPlays.maxPairs,
   feeCents: openPlays.feeCents,
+  kind: openPlays.kind,
   pairCount: pairCountSql,
   live: liveSql,
+  ended: endedSql,
 };
 
 export async function createOpenPlay(
   db: Db,
-  input: OpenPlayInput,
+  /** `kind` defaults to Ranked. */
+  input: Omit<OpenPlayInput, "kind"> & { kind?: OpenPlayKind },
   /** The account scheduling it; it manages the open play. */
   createdBy: string | null = null,
 ): Promise<string> {
@@ -977,24 +1036,24 @@ export async function playerInManagedOpenPlay(
 }
 
 /**
- * Check a registered player in at the venue (or undo it). False when
- * they aren't signed up for this open play.
+ * Check a pair in at the venue, both players at once (or undo it). False
+ * when there's no such pair in this open play.
  */
-export async function setCheckIn(
+export async function setPairCheckIn(
   db: Db,
   openPlayId: string,
-  playerId: string,
+  pairId: string,
   checkedIn: boolean,
   now: Date = new Date(),
 ): Promise<boolean> {
-  if (!z.uuid().safeParse(playerId).success) return false;
+  if (!z.uuid().safeParse(pairId).success) return false;
   const rows = await db
     .update(registrations)
     .set({ checkedInAt: checkedIn ? now : null })
     .where(
       and(
         eq(registrations.openPlayId, openPlayId),
-        eq(registrations.playerId, playerId),
+        eq(registrations.pairId, pairId),
       ),
     )
     .returning({ id: registrations.id });
@@ -1035,6 +1094,10 @@ async function registrationProblem(
 ): Promise<string | null> {
   const play = await getOpenPlay(db, openPlayId);
   if (!play) return "Open play not found";
+  if (play.ended) return "This open play has ended";
+  if (play.kind === "regular") {
+    return "This is a Regular open play: add pairs by name at the booth";
+  }
   for (const p of people) {
     if (p.playerId) {
       if (!(await getPlayer(db, p.playerId))) return "Player not found";
@@ -1042,7 +1105,7 @@ async function registrationProblem(
       const [taken] = await db
         .select({ id: players.id })
         .from(players)
-        .where(sql`lower(${players.name}) = ${nameKey(p.name)}`);
+        .where(realNamed(p.name));
       if (taken) return `${p.name} is already registered. Pick them instead.`;
     }
     const owner = await emailOwner(db, p.email);
@@ -1126,7 +1189,7 @@ function entry(input: PairRegistration | PairUp) {
     status: "paid" as const,
     amountCents: input.amountCents,
     method: input.method,
-    reference: input.reference,
+    notes: input.notes,
     paidAt: new Date(),
   };
 }
@@ -1151,7 +1214,11 @@ export async function registerPair(
       .values(
         "amountCents" in input
           ? entry(input)
-          : { openPlayId: input.openPlayId, status: "pending" },
+          : {
+              openPlayId: input.openPlayId,
+              status: "pending",
+              notes: input.notes,
+            },
       )
       .returning({ id: pairs.id });
     await tx.insert(registrations).values(
@@ -1163,6 +1230,368 @@ export async function registerPair(
     );
     return { pairId: pair.id, players: people };
   });
+}
+
+/**
+ * The first of these names someone in this open play already goes by
+ * (any case), leaving out `except` (a player being renamed). Null when
+ * all are free: names stay unique within an open play.
+ */
+async function nameTakenIn(
+  db: Db,
+  openPlayId: string,
+  names: string[],
+  except: string[] = [],
+): Promise<string | null> {
+  const keys = names.map(nameKey);
+  const rows = await db
+    .select({ name: players.name })
+    .from(registrations)
+    .innerJoin(players, eq(players.id, registrations.playerId))
+    .where(
+      and(
+        eq(registrations.openPlayId, openPlayId),
+        inArray(sql`lower(${players.name})`, keys),
+        except.length ? notInArray(players.id, except) : undefined,
+      ),
+    );
+  const taken = new Set(rows.map((r) => nameKey(r.name)));
+  return names.find((n) => taken.has(nameKey(n))) ?? null;
+}
+
+/**
+ * A Regular open play's pair, by name only ("gel/son"): two guest players
+ * for this open play (no email, no shared record), paid or not. Guests
+ * take the rank the host picked (the open play's lowest by default), so
+ * the rank rule never turns them away; a paid pair still has to fit the
+ * cap.
+ */
+export async function registerGuestPair(
+  db: Db,
+  input: GuestPair,
+): Promise<{ pairId: string } | { error: string }> {
+  const play = await getOpenPlay(db, input.openPlayId);
+  if (!play) return { error: "Open play not found" };
+  if (play.ended) return { error: "This open play has ended" };
+  if (play.kind !== "regular") {
+    return { error: "Ranked open plays need each player's details" };
+  }
+  if (input.paid && play.maxPairs !== null && play.pairCount >= play.maxPairs) {
+    return { error: "This open play is full" };
+  }
+  if (input.rank && !play.levels.includes(input.rank)) {
+    return { error: "Pick one of this open play's ranks" };
+  }
+  const taken = await nameTakenIn(db, play.id, input.names);
+  if (taken) return { error: `${taken} is already in this open play` };
+  const level = input.rank ?? play.levels[0] ?? "beginner";
+  return db.transaction(async (tx) => {
+    const people = await tx
+      .insert(players)
+      .values(input.names.map((name) => ({ name, level, guest: true })))
+      .returning({ id: players.id });
+    const [pair] = await tx
+      .insert(pairs)
+      .values(
+        input.paid
+          ? {
+              openPlayId: play.id,
+              status: "paid",
+              amountCents: play.feeCents,
+              method: "cash",
+              notes: input.notes,
+              paidAt: new Date(),
+            }
+          : { openPlayId: play.id, status: "pending", notes: input.notes },
+      )
+      .returning({ id: pairs.id });
+    await tx.insert(registrations).values(
+      people.map((p) => ({
+        playerId: p.id,
+        openPlayId: play.id,
+        pairId: pair.id,
+      })),
+    );
+    return { pairId: pair.id };
+  });
+}
+
+/** A Regular open play's player who came alone, by name: paired later. */
+export async function registerGuestSolo(
+  db: Db,
+  input: GuestSolo,
+): Promise<{ playerId: string } | { error: string }> {
+  const play = await getOpenPlay(db, input.openPlayId);
+  if (!play) return { error: "Open play not found" };
+  if (play.ended) return { error: "This open play has ended" };
+  if (play.kind !== "regular") {
+    return { error: "Ranked open plays need each player's details" };
+  }
+  if (input.rank && !play.levels.includes(input.rank)) {
+    return { error: "Pick one of this open play's ranks" };
+  }
+  const taken = await nameTakenIn(db, play.id, [input.name]);
+  if (taken) return { error: `${taken} is already in this open play` };
+  return db.transaction(async (tx) => {
+    const [me] = await tx
+      .insert(players)
+      .values({
+        name: input.name,
+        level: input.rank ?? play.levels[0] ?? "beginner",
+        guest: true,
+      })
+      .returning({ id: players.id });
+    await tx
+      .insert(registrations)
+      .values({ playerId: me.id, openPlayId: play.id });
+    return { playerId: me.id };
+  });
+}
+
+/**
+ * Regular open plays: pair two guests who came alone, paid (the entry
+ * fee, cash) or not. A paid pair has to fit the cap.
+ */
+export async function pairGuestSolos(
+  db: Db,
+  input: { openPlayId: string; a: string; b: string; paid: boolean },
+): Promise<{ pairId: string } | { error: string }> {
+  const play = await getOpenPlay(db, input.openPlayId);
+  if (!play) return { error: "Open play not found" };
+  if (play.ended) return { error: "This open play has ended" };
+  if (play.kind !== "regular") return { error: "Only Regular open plays" };
+  const ids = [input.a, input.b];
+  if (
+    input.a === input.b ||
+    !ids.every((id) => z.uuid().safeParse(id).success)
+  ) {
+    return { error: "Pick two different players" };
+  }
+  const solos = await db
+    .select({ id: registrations.id })
+    .from(registrations)
+    .innerJoin(players, eq(players.id, registrations.playerId))
+    .where(
+      and(
+        eq(registrations.openPlayId, play.id),
+        isNull(registrations.pairId),
+        eq(players.guest, true),
+        inArray(registrations.playerId, ids),
+      ),
+    );
+  if (solos.length !== 2) {
+    return { error: "Both players must be signed up alone for this open play" };
+  }
+  if (input.paid && play.maxPairs !== null && play.pairCount >= play.maxPairs) {
+    return { error: "This open play is full" };
+  }
+  return db.transaction(async (tx) => {
+    const [pair] = await tx
+      .insert(pairs)
+      .values(
+        input.paid
+          ? {
+              openPlayId: play.id,
+              status: "paid",
+              amountCents: play.feeCents,
+              method: "cash",
+              paidAt: new Date(),
+            }
+          : { openPlayId: play.id, status: "pending" },
+      )
+      .returning({ id: pairs.id });
+    await tx
+      .update(registrations)
+      .set({ pairId: pair.id })
+      .where(
+        inArray(
+          registrations.id,
+          solos.map((s) => s.id),
+        ),
+      );
+    return { pairId: pair.id };
+  });
+}
+
+/**
+ * Regular open plays: fix a solo guest's name, or remove them (they
+ * haven't paired yet). Returns an error, or null.
+ */
+export async function renameGuestSolo(
+  db: Db,
+  playerId: string,
+  name: string,
+): Promise<string | null> {
+  const openPlayId = await soloGuest(db, playerId);
+  if (!openPlayId) return "Player not found";
+  const taken = await nameTakenIn(db, openPlayId, [name], [playerId]);
+  if (taken) return `${taken} is already in this open play`;
+  await db.update(players).set({ name }).where(eq(players.id, playerId));
+  return null;
+}
+
+export async function removeGuestSolo(
+  db: Db,
+  playerId: string,
+): Promise<string | null> {
+  if (!(await soloGuest(db, playerId))) return "Player not found";
+  // A guest belongs to one open play: removing the sign-up removes them.
+  await db.transaction(async (tx) => {
+    await tx.delete(registrations).where(eq(registrations.playerId, playerId));
+    await tx.delete(players).where(eq(players.id, playerId));
+  });
+  return null;
+}
+
+/** The open play a guest signed up alone for, or null. */
+export async function soloGuest(
+  db: Db,
+  playerId: string,
+): Promise<string | null> {
+  if (!z.uuid().safeParse(playerId).success) return null;
+  const [row] = await db
+    .select({ openPlayId: registrations.openPlayId })
+    .from(registrations)
+    .innerJoin(players, eq(players.id, registrations.playerId))
+    .where(
+      and(
+        eq(registrations.playerId, playerId),
+        isNull(registrations.pairId),
+        eq(players.guest, true),
+      ),
+    );
+  return row?.openPlayId ?? null;
+}
+
+/**
+ * Regular open plays: the host typed one name for a pair. That player
+ * stays, alone (renamed to what was typed), ready to pair again; the other
+ * is removed, and so is the pair and its payment. Not while the pair is in
+ * a running queue. Returns an error, or null.
+ */
+export async function splitGuestPair(
+  db: Db,
+  pairId: string,
+  name: string,
+): Promise<string | null> {
+  if (!z.uuid().safeParse(pairId).success) return "Pair not found";
+  const people = await db
+    .select({
+      id: players.id,
+      name: players.name,
+      guest: players.guest,
+      openPlayId: registrations.openPlayId,
+    })
+    .from(registrations)
+    .innerJoin(players, eq(players.id, registrations.playerId))
+    .where(eq(registrations.pairId, pairId))
+    .orderBy(asc(registrations.createdAt), asc(sql`lower(${players.name})`));
+  if (people.length !== 2) return "Pair not found";
+  if (!people.every((p) => p.guest)) {
+    return "Only Regular pairs are changed here";
+  }
+  const session = await getLiveSession(db, people[0].openPlayId);
+  if (session?.players[pairId]) {
+    return "They're in the queue. Remove them there first.";
+  }
+  const keep =
+    people.find((p) => nameKey(p.name) === nameKey(name)) ?? people[0];
+  const drop = people.find((p) => p.id !== keep.id)!;
+  const taken = await nameTakenIn(
+    db,
+    keep.openPlayId,
+    [name],
+    people.map((p) => p.id),
+  );
+  if (taken) return `${taken} is already in this open play`;
+  await db.transaction(async (tx) => {
+    await tx
+      .update(registrations)
+      .set({ pairId: null })
+      .where(eq(registrations.playerId, keep.id));
+    await tx.update(players).set({ name }).where(eq(players.id, keep.id));
+    await tx.delete(registrations).where(eq(registrations.playerId, drop.id));
+    await tx.delete(players).where(eq(players.id, drop.id));
+    await tx.delete(pairs).where(eq(pairs.id, pairId));
+  });
+  return null;
+}
+
+/**
+ * Regular open plays: fix a pair's names (two guests, in list order). A
+ * running queue shows the new names too. Returns an error, or null.
+ */
+export async function renameGuestPair(
+  db: Db,
+  pairId: string,
+  names: [string, string],
+): Promise<string | null> {
+  if (!z.uuid().safeParse(pairId).success) return "Pair not found";
+  const people = await db
+    .select({
+      id: players.id,
+      guest: players.guest,
+      openPlayId: registrations.openPlayId,
+    })
+    .from(registrations)
+    .innerJoin(players, eq(players.id, registrations.playerId))
+    .where(eq(registrations.pairId, pairId))
+    .orderBy(asc(registrations.createdAt), asc(sql`lower(${players.name})`));
+  if (people.length !== 2) return "Pair not found";
+  if (!people.every((p) => p.guest)) {
+    return "Only Regular pairs are renamed here";
+  }
+  const taken = await nameTakenIn(
+    db,
+    people[0].openPlayId,
+    names,
+    people.map((p) => p.id),
+  );
+  if (taken) return `${taken} is already in this open play`;
+  await db.transaction(async (tx) => {
+    for (const [i, p] of people.entries()) {
+      await tx
+        .update(players)
+        .set({ name: names[i] })
+        .where(eq(players.id, p.id));
+    }
+  });
+  const openPlayId = people[0].openPlayId;
+  const session = await getLiveSession(db, openPlayId);
+  const unit = session?.players[pairId];
+  if (session && unit) {
+    await saveSession(db, openPlayId, {
+      ...session,
+      players: {
+        ...session.players,
+        [pairId]: { ...unit, name: pairName(names) },
+      },
+    });
+  }
+  return null;
+}
+
+/**
+ * Regular open plays: mark a paid pair as not paid after all. Returns an
+ * error, or null when done.
+ */
+export async function markPairUnpaid(
+  db: Db,
+  pairId: string,
+): Promise<string | null> {
+  if (!z.uuid().safeParse(pairId).success) return "Pair not found";
+  const [row] = await db
+    .select({ kind: openPlays.kind })
+    .from(pairs)
+    .innerJoin(openPlays, eq(openPlays.id, pairs.openPlayId))
+    .where(eq(pairs.id, pairId));
+  if (!row) return "Pair not found";
+  if (row.kind !== "regular") return "Only Regular open plays can do that";
+  await db
+    .update(pairs)
+    .set({ status: "pending", amountCents: null, method: null, paidAt: null })
+    .where(eq(pairs.id, pairId));
+  return null;
 }
 
 /** Sign up a player alone, looking for a partner (unpaid until paired). */
@@ -1264,7 +1693,7 @@ export type DayPair = {
   id: string;
   amountCents: number;
   method: PaymentMethod;
-  reference: string;
+  notes: string;
   createdAt: Date;
   members: DayMember[];
 };
@@ -1273,6 +1702,7 @@ export type DayPair = {
 export type PendingPair = {
   id: string;
   requestedLevel: Level | null;
+  notes: string;
   createdAt: Date;
   members: DayMember[];
 };
@@ -1324,7 +1754,7 @@ export async function listRegistrations(
               id: p.id,
               amountCents: p.amountCents,
               method: p.method,
-              reference: p.reference,
+              notes: p.notes,
               createdAt: p.paidAt ?? p.createdAt,
               members: membersOf(p.id),
             },
@@ -1336,6 +1766,7 @@ export async function listRegistrations(
       .map((p) => ({
         id: p.id,
         requestedLevel: p.requestedLevel,
+        notes: p.notes,
         createdAt: p.createdAt,
         members: membersOf(p.id),
       }))
@@ -1394,7 +1825,7 @@ async function resolvePublic(
     const [found] = await db
       .select({ id: players.id, name: players.name, email: players.email })
       .from(players)
-      .where(sql`lower(${players.name}) = ${nameKey(p.name)}`);
+      .where(realNamed(p.name));
     if (!found) {
       out.push(p);
       continue;
@@ -1530,7 +1961,7 @@ export async function confirmPairPayment(
       status: "paid",
       amountCents: input.amountCents,
       method: input.method,
-      reference: input.reference,
+      notes: input.notes || pair.notes,
       paidAt: new Date(),
     })
     .where(and(eq(pairs.id, pair.id), eq(pairs.status, "pending")));
@@ -1544,6 +1975,21 @@ export async function confirmPairPayment(
       email: p.email ?? "",
     })),
   };
+}
+
+/** Replace the host's notes on a pair; false when there's no such pair. */
+export async function setPairNotes(
+  db: Db,
+  pairId: string,
+  notes: string,
+): Promise<boolean> {
+  if (!z.uuid().safeParse(pairId).success) return false;
+  const rows = await db
+    .update(pairs)
+    .set({ notes })
+    .where(eq(pairs.id, pairId))
+    .returning({ id: pairs.id });
+  return rows.length > 0;
 }
 
 /**
@@ -1586,7 +2032,8 @@ export type PairUnit = {
 /**
  * An open play's pairs, paid and unpaid, as queue units: "Ana & Ben" at
  * its level, checked against the players' current levels, with who's
- * checked in. Only paid, checked-in pairs can join (`notReady`).
+ * checked in. Before the start only paid, checked-in pairs can join;
+ * once live, paid is enough (`notReady`).
  */
 export async function rosterPairs(
   db: Db,
@@ -1877,6 +2324,22 @@ export async function liveSessionGames(
   db: Db,
   openPlayId: string,
 ): Promise<UnitGame[]> {
+  return unitGames(db, openPlayId, live(openPlayId));
+}
+
+/** Every scored game of an open play, across all its sessions. */
+export async function openPlayGames(
+  db: Db,
+  openPlayId: string,
+): Promise<UnitGame[]> {
+  return unitGames(db, openPlayId, eq(sessions.openPlayId, openPlayId));
+}
+
+async function unitGames(
+  db: Db,
+  openPlayId: string,
+  which: SQL | undefined,
+): Promise<UnitGame[]> {
   if (!z.uuid().safeParse(openPlayId).success) return [];
   const rows = await db
     .select({
@@ -1896,7 +2359,7 @@ export async function liveSessionGames(
         eq(registrations.openPlayId, openPlayId),
       ),
     )
-    .where(live(openPlayId))
+    .where(which)
     .orderBy(asc(matches.endedAt));
   const games = new Map<string, UnitGame>();
   for (const r of rows) {
@@ -1912,6 +2375,39 @@ export async function liveSessionGames(
     games.set(r.id, g);
   }
   return [...games.values()];
+}
+
+/** Every recorded match of an open play, newest first. */
+export async function openPlayMatches(
+  db: Db,
+  openPlayId: string,
+): Promise<RecordedMatch[]> {
+  if (!z.uuid().safeParse(openPlayId).success) return [];
+  const ids = await db
+    .select({ id: matches.id })
+    .from(matches)
+    .innerJoin(sessions, eq(sessions.id, matches.sessionId))
+    .where(eq(sessions.openPlayId, openPlayId));
+  return loadMatches(
+    db,
+    ids.map((r) => r.id),
+  );
+}
+
+/** Whether a session of this open play was run and ended. */
+export async function hasEndedSession(
+  db: Db,
+  openPlayId: string,
+): Promise<boolean> {
+  if (!z.uuid().safeParse(openPlayId).success) return false;
+  const [row] = await db
+    .select({ id: sessions.id })
+    .from(sessions)
+    .where(
+      and(eq(sessions.openPlayId, openPlayId), eq(sessions.status, "ended")),
+    )
+    .limit(1);
+  return Boolean(row);
 }
 
 /** The player with this (verified or desk-entered) email, if any. */

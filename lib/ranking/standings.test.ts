@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  finalStandings,
   gamePoints,
   POINTS,
   predictionStatus,
@@ -183,5 +184,26 @@ describe("topStandings", () => {
       ["a", 1],
       ["b", 1],
     ]);
+  });
+});
+
+describe("finalStandings", () => {
+  it("ranks everyone who joined, pairs without games last", () => {
+    const rows = finalStandings(
+      [unit("a"), unit("b"), unit("z"), unit("c")],
+      [game("a", "b", 11, 4)],
+    );
+    expect(rows.map((r) => [r.name, r.rank, r.games])).toEqual([
+      ["A", 1, 1],
+      ["B", 2, 1],
+      ["C", 3, 0],
+      ["Z", 3, 0],
+    ]);
+  });
+
+  it("lists everyone at one rank when no one played", () => {
+    expect(
+      finalStandings([unit("b"), unit("a")], []).map((r) => r.rank),
+    ).toEqual([1, 1]);
   });
 });

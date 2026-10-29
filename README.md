@@ -62,13 +62,16 @@ Vercel.
      inbox) if it isn't running;
    - applies any new migrations in `supabase/migrations` (your data is
      kept; nothing happens when you're up to date);
+   - runs the app against the **local** database, even if `.env.local`
+     points `DATABASE_URL` at hosted Supabase;
    - runs the app on **http://localhost:1027** (or the next free port,
      never 3000–3010), printed in the terminal;
    - opens three tabs: the app, Mailpit, and Supabase Studio (browse and
      edit tables and data).
 
    Use `npm run dev -- --no-open` to skip the browser, or
-   `npm run dev:next` for plain `next dev`.
+   `npm run dev:next` for plain `next dev` (uses `.env.local` as is,
+   so it can reach the hosted database).
 
 4. **Sign in as the first admin**
 
@@ -105,6 +108,7 @@ Vercel.
 | `npm run db:generate`       | New migration after editing `lib/db/schema.ts`                        |
 | `npx supabase migration up` | Apply new migrations without restarting (`npm run dev` does this too) |
 | `npm run db:reset`          | Wipe local data, re-run all migrations, load `supabase/seed.sql`      |
+| `npm run db:admin`          | Local `admin` signs in with `ADMIN_PASSWORD` from `.env.local`        |
 | `npm run db:stop`           | Stop local Supabase                                                   |
 
 ## Deploy (Vercel)
@@ -133,8 +137,10 @@ Pushes to `main` deploy on Vercel (Hobby plan). Functions run in Mumbai
   Next prints).
 - **No verification email** Locally, every email lands in Mailpit at
   http://127.0.0.1:54324.
-- **Locked out of staff** Run `npm run db:reset` (this deletes all local
-  data and loads the sample data), then sign in as `admin` / `pop-admin-123`.
+- **Locked out of staff** Run `npm run db:admin` to give the local `admin`
+  your `ADMIN_PASSWORD` from `.env.local` (data is kept). Or run
+  `npm run db:reset` (this deletes all local data and loads the sample
+  data), then sign in as `admin` / `pop-admin-123`.
 
 ## Docs
 

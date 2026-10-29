@@ -13,6 +13,7 @@ export function Modal({
   children,
   footer,
   tone = "from-sky-400 to-violet-500",
+  wide = false,
 }: {
   title: string;
   eyebrow?: string;
@@ -21,6 +22,8 @@ export function Modal({
   footer?: ReactNode;
   /** Header gradient classes. */
   tone?: string;
+  /** Room for a form: max-w-xl instead of max-w-md. */
+  wide?: boolean;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
 
@@ -40,7 +43,7 @@ export function Modal({
         // A click on the dialog element itself is a click on the backdrop.
         if (e.target === e.currentTarget) onClose();
       }}
-      className="m-auto max-h-[85dvh] w-[calc(100%-2rem)] max-w-md overflow-hidden rounded-[2rem] bg-white p-0 text-ink shadow-[0_30px_80px_-20px_rgba(36,28,71,0.5)] backdrop:bg-ink/40 backdrop:backdrop-blur-sm"
+      className={`m-auto max-h-[85dvh] w-[calc(100%-2rem)] ${wide ? "max-w-xl" : "max-w-md"} overflow-hidden rounded-[2rem] bg-white p-0 text-ink shadow-[0_30px_80px_-20px_rgba(36,28,71,0.5)] backdrop:bg-ink/40 backdrop:backdrop-blur-sm`}
     >
       <div className="animate-pop-in flex max-h-[85dvh] flex-col motion-reduce:animate-none">
         <header
@@ -54,7 +57,7 @@ export function Modal({
             )}
             <h2
               id="modal-title"
-              className="truncate font-display text-2xl font-bold"
+              className="line-clamp-2 font-display text-2xl font-bold break-words"
             >
               {title}
             </h2>

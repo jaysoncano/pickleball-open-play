@@ -210,3 +210,34 @@ function standingsWithin(rows: Standing[]): Standing[] {
   });
   return out;
 }
+
+/**
+ * Everyone who joined, best first, for an open play's final results:
+ * pairs with games by their standing, then pairs who never played
+ * (sharing the next rank), by name.
+ */
+export function finalStandings(
+  units: StandingUnit[],
+  games: UnitGame[],
+): Standing[] {
+  const played = standings(units, games);
+  const seen = new Set(played.map((s) => s.id));
+  const idle = units
+    .filter((u) => !seen.has(u.id))
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((u) => ({
+      id: u.id,
+      name: u.name,
+      skill: u.skill,
+      games: 0,
+      wins: 0,
+      losses: 0,
+      pointsFor: 0,
+      pointsAgainst: 0,
+      pointDiff: 0,
+      points: 0,
+      rating: 0,
+      rank: played.length + 1,
+    }));
+  return [...played, ...idle];
+}

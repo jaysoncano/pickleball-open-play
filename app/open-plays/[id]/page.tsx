@@ -12,6 +12,7 @@ import {
   RankChip,
 } from "@/components/open-plays/open-play-card";
 import { RankRoster } from "@/components/open-plays/rank-roster";
+import { ResultsView } from "@/components/open-plays/results-view";
 import { SignupForm } from "@/components/open-plays/signup-form";
 import { PublicBoard } from "@/components/public-board";
 import { currentAdmin, managesOpenPlay } from "@/lib/auth-server";
@@ -22,6 +23,10 @@ import {
   listRegistrations,
   pairMembers,
   type OpenPlay,
+  hasEndedSession,
+  openPlayGames,
+  openPlayMatches,
+  rosterPairs,
 } from "@/lib/db/queries";
 import { LEVEL_INFO, LevelSchema, type Level } from "@/lib/ranking/levels";
 import { formatMoney, openPlayFee, pairLevel } from "@/lib/registration/forms";
@@ -50,9 +55,29 @@ async function OpenPlayView({ params, searchParams }: Props) {
   const [play, me] = await Promise.all([getOpenPlay(db, id), currentAdmin()]);
   if (!play) notFound();
   const session = await getLiveSession(db, id);
+  const host = await managesOpenPlay(me, id);
+
+  // Once a session has ended, the open play shows its results (it isn't
+  // set up again): the top pairs, everyone ranked, and every game.
+  if (!session && (await hasEndedSession(db, id))) {
+    const [pairs, games, matches] = await Promise.all([
+      rosterPairs(db, id),
+      openPlayGames(db, id),
+      openPlayMatches(db, id),
+    ]);
+    return (
+      <ResultsView
+        play={play}
+        pairs={pairs.filter((p) => p.paid)}
+        games={games}
+        matches={matches}
+        backHref={host ? "/host" : "/"}
+      />
+    );
+  }
 
   // Its hosts (and admins) run it; everyone else sees the public page.
-  if (await managesOpenPlay(me, id)) {
+  if (host) {
     return (
       <App
         openPlay={{
@@ -182,7 +207,24 @@ async function PublicOpenPlay({
           solos={solos.filter((m) => (m.requestedLevel ?? m.level) === rank)}
         />
       )}
-      {rank && (
+      {rank && play.kind === "regular" && (
+        <section aria-labelledby="join-title" className={CARD}>
+          <h2 id="join-title" className="font-display text-2xl font-bold">
+            ✋ Join at the booth
+          </h2>
+          <p className="mt-2 text-ink/80">
+            Come to the host&apos;s booth with your partner, give your names,
+            and pay <b>{fee}</b> for your pair. Once you&apos;re paid,
+            you&apos;re in the queue.
+          </p>
+          {left === 0 && (
+            <p className="mt-3 rounded-2xl bg-rose-100 px-4 py-3 font-semibold text-rose-700">
+              This open play is full.
+            </p>
+          )}
+        </section>
+      )}
+      {rank && play.kind === "ranked" && (
         <section aria-labelledby="join-title" className={CARD}>
           <h2 id="join-title" className="font-display text-2xl font-bold">
             ✋ Join {LEVEL_INFO[rank].label}

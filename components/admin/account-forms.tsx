@@ -85,7 +85,7 @@ export function ChangePasswordForm() {
       </div>
       <Result state={state} ok="Password changed" />
       <ConfirmSubmit
-        confirmLabel="Tap again to change password"
+        confirmLabel="Change password?"
         variant="secondary"
         disabled={pending}
       >
@@ -162,12 +162,10 @@ export function RemoveAdmin({
     <>
       <ConfirmButton
         label={`Remove account ${username}`}
-        confirmLabel="Remove?"
         onConfirm={() =>
           start(async () => setError(await removeAdminAccount(id)))
         }
         className="min-h-11 px-3 text-sm text-ink/55 hover:bg-ink/5"
-        armedClassName="min-h-11 text-sm"
       >
         {busy ? "…" : "Remove"}
       </ConfirmButton>
@@ -338,7 +336,7 @@ export function GroupForm({
           </p>
         )
       )}
-      <ConfirmSubmit confirmLabel="Tap again to save group" disabled={pending}>
+      <ConfirmSubmit confirmLabel="Save group?" disabled={pending}>
         {pending ? "Saving…" : "Save group"}
       </ConfirmSubmit>
     </form>

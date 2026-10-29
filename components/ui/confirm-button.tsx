@@ -1,54 +1,54 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
-
-const RESET_AFTER_MS = 3000;
+import { useState, type ReactNode } from "react";
+import { ConfirmDialog } from "./confirm-dialog";
 
 /**
- * Two-tap button for destructive actions: the first tap arms it, the second
- * confirms. Disarms itself after a few seconds. Avoids blocking dialogs.
+ * Button for destructive actions: the tap asks in a popup ("Remove Ana?"),
+ * and only confirming does it.
  */
 export function ConfirmButton({
   children,
-  confirmLabel = "Sure?",
   onConfirm,
   label,
+  warning,
+  confirmText,
   className = "",
-  armedClassName = "",
 }: {
   children: ReactNode;
-  confirmLabel?: ReactNode;
   onConfirm: () => void;
-  /** Accessible name, e.g. "Remove Ana". */
+  /** Accessible name and the popup's question, e.g. "Remove Ana". */
   label: string;
+  /** Shown under the question. */
+  warning?: ReactNode;
+  /** The popup's button; defaults to the label's first word ("Remove"). */
+  confirmText?: ReactNode;
   className?: string;
-  armedClassName?: string;
 }) {
-  const [armed, setArmed] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  useEffect(() => () => clearTimeout(timer.current), []);
-
-  function handleClick() {
-    clearTimeout(timer.current);
-    if (armed) {
-      setArmed(false);
-      onConfirm();
-      return;
-    }
-    setArmed(true);
-    timer.current = setTimeout(() => setArmed(false), RESET_AFTER_MS);
-  }
-
+  const [asking, setAsking] = useState(false);
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      onBlur={() => setArmed(false)}
-      aria-label={armed ? `Confirm: ${label}` : label}
-      className={`relative inline-flex items-center justify-center rounded-full font-display font-semibold transition-all duration-150 after:absolute after:-inset-1.5 focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-sky-400 ${armed ? `bg-rose-500 px-3 text-white ${armedClassName}` : className}`}
-    >
-      {armed ? confirmLabel : children}
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={() => setAsking(true)}
+        aria-label={label}
+        className={`relative inline-flex items-center justify-center rounded-full font-display font-semibold transition-all duration-150 after:absolute after:-inset-1.5 focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-sky-400 ${className}`}
+      >
+        {children}
+      </button>
+      {asking && (
+        <ConfirmDialog
+          danger
+          title={`${label}?`}
+          warning={warning}
+          confirmText={confirmText ?? label.split(" ")[0]}
+          onCancel={() => setAsking(false)}
+          onConfirm={() => {
+            setAsking(false);
+            onConfirm();
+          }}
+        />
+      )}
+    </>
   );
 }

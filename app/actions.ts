@@ -82,12 +82,16 @@ import {
   formatMoney,
   METHOD_LABEL,
   nestForm,
+  NotesSchema,
   openPlayFee,
   ConfirmPaymentSchema,
+  GuestPairSchema,
+  GuestSoloSchema,
   PairRegistrationSchema,
   PairUpSchema,
   PublicSignupSchema,
   PublicSoloSchema,
+  RegistrationNameSchema,
   SoloRegistrationSchema,
   UnpaidPairSchema,
   type PairRegistration,
@@ -492,14 +496,56 @@ export async function rosterFor(openPlayId: string) {
   return q.rosterPairs(getDb(), openPlayId);
 }
 
-/** Check a player in at the venue (or undo it). */
-export async function checkIn(
+/**
+ * The open play's entry fee and kind, for confirming a payment from the
+ * dashboard (Regular marks paid in one step; Ranked takes the details).
+ */
+export async function entryFee(openPlayId: string) {
+  await requireOpenPlay(openPlayId);
+  const play = await q.getOpenPlay(getDb(), openPlayId);
+  return play
+    ? {
+        fee: { cents: play.feeCents, currency: openPlayFee().currency },
+        kind: play.kind,
+      }
+    : null;
+}
+
+/**
+ * The live dashboard's "New pair" popup: the open play's fee, and the
+ * players this account may link (admins: everyone; hosts: their players).
+ */
+export async function quickRegisterInfo(openPlayId: string) {
+  const me = await requireOpenPlay(openPlayId);
+  const db = getDb();
+  const play = await q.getOpenPlay(db, openPlayId);
+  if (!play) return null;
+  const rows = await q.listClaimTokens(
+    db,
+    me.role === "admin" ? undefined : await q.managedPlayerIds(db, me.id),
+  );
+  return {
+    fee: { cents: play.feeCents, currency: openPlayFee().currency },
+    kind: play.kind,
+    levels: play.levels,
+    known: rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      firstName: r.firstName,
+      lastName: r.lastName,
+      email: r.email ?? "",
+    })),
+  };
+}
+
+/** Check a pair in at the venue, both players together (or undo it). */
+export async function checkInPair(
   openPlayId: string,
-  playerId: string,
+  pairId: string,
   checkedIn: boolean,
 ): Promise<boolean> {
   await requireOpenPlay(openPlayId);
-  const ok = await q.setCheckIn(getDb(), openPlayId, playerId, checkedIn);
+  const ok = await q.setPairCheckIn(getDb(), openPlayId, pairId, checkedIn);
   if (ok) revalidatePath("/admin/players");
   return ok;
 }
@@ -517,6 +563,10 @@ export async function startOpenPlay(
   const db = getDb();
   const play = await q.getOpenPlay(db, openPlayId);
   if (!play) return { error: "Open play not found" };
+  // Ended means done: its results stand, it isn't run again.
+  if (await q.hasEndedSession(db, openPlayId)) {
+    return { error: "This open play has ended. See its results." };
+  }
   if (!courtLevels.every((l) => play.levels.includes(l))) {
     return { error: "Each court must play one of this open play's ranks" };
   }
@@ -557,9 +607,12 @@ export async function startOpenPlay(
 
 /** Late arrivals: only paid, checked-in pairs that can play its ranks. */
 export async function addLateArrivals(openPlayId: string, pairIds: string[]) {
-  return pickRegistered(await rosterFor(openPlayId), pairIds)
-    .players.filter((p) => !notReady(p))
-    .map(asUnit);
+  return (
+    pickRegistered(await rosterFor(openPlayId), pairIds)
+      // Running already: no check-in needed, paid is enough.
+      .players.filter((p) => !notReady(p, { live: true }))
+      .map(asUnit)
+  );
 }
 
 /** What the queue keeps of a pair: id, name, and its rank. */
@@ -827,12 +880,7 @@ async function editorEmail(
   const editor = await profileEditor(playerId);
   if (!editor)
     return { error: "Scan your QR code and verify your email first" };
-  if (editor.admin) {
-    // Hosts can't move a player's confirmed email; only admins can.
-    const contact = await q.getPlayerPrivate(getDb(), playerId);
-    const host = (await currentAdmin())?.role !== "admin";
-    return { email: host && contact?.emailConfirmedAt ? contact.email : typed };
-  }
+  if (editor.admin) return { email: typed };
   if (!(await q.hasPaidRegistration(getDb(), playerId))) {
     return { error: NOT_PAID };
   }
@@ -945,6 +993,10 @@ export type RegisterState = FormState & {
     note?: string;
     /** Saved as unpaid: no receipt until the payment is confirmed. */
     unpaid?: boolean;
+    /** A Regular open play's names-only pair: nothing is emailed. */
+    guest?: boolean;
+    /** Signed up alone: waits to be paired. */
+    solo?: boolean;
   };
 };
 
@@ -960,7 +1012,7 @@ const playDay = new Intl.DateTimeFormat("en", {
 async function sendReceipts(
   who: q.Registered,
   openPlayId: string,
-  entry: Pick<PairRegistration, "amountCents" | "method" | "reference"> | null,
+  entry: Pick<PairRegistration, "amountCents" | "method"> | null,
 ): Promise<RegisterState> {
   const play = await q.getOpenPlay(getDb(), openPlayId);
   if (!play) return { error: "Open play not found" };
@@ -987,7 +1039,6 @@ async function sendReceipts(
             ? {
                 amount: formatMoney(entry.amountCents, openPlayFee().currency),
                 method: METHOD_LABEL[entry.method],
-                reference: entry.reference,
               }
             : undefined,
           receiptNo: (who.pairId ?? p.id).slice(0, 8).toUpperCase(),
@@ -1044,6 +1095,187 @@ async function registerUnpaidPair(form: FormData): Promise<RegisterState> {
   };
 }
 
+/** Regular open plays: add a pair by name ("gel/son"), paid or not. */
+export async function registerGuestEntry(
+  _prev: RegisterState,
+  form: FormData,
+): Promise<RegisterState> {
+  await requireStaff();
+  const parsed = GuestPairSchema.safeParse(Object.fromEntries(form));
+  if (!parsed.success) return { error: firstError(parsed) };
+  await requireOpenPlay(parsed.data.openPlayId);
+  const r = await q.registerGuestPair(getDb(), parsed.data);
+  if ("error" in r) return { error: r.error };
+  revalidatePath("/", "layout");
+  return {
+    error: null,
+    ok: true,
+    done: {
+      names: parsed.data.names,
+      emailed: false,
+      unpaid: !parsed.data.paid,
+      guest: true,
+    },
+  };
+}
+
+/** Regular open plays: add a player who came alone, by name. */
+export async function registerGuestSoloEntry(
+  _prev: RegisterState,
+  form: FormData,
+): Promise<RegisterState> {
+  await requireStaff();
+  const parsed = GuestSoloSchema.safeParse(Object.fromEntries(form));
+  if (!parsed.success) return { error: firstError(parsed) };
+  await requireOpenPlay(parsed.data.openPlayId);
+  const r = await q.registerGuestSolo(getDb(), parsed.data);
+  if ("error" in r) return { error: r.error };
+  revalidatePath("/", "layout");
+  return {
+    error: null,
+    ok: true,
+    done: {
+      names: [parsed.data.name],
+      emailed: false,
+      guest: true,
+      solo: true,
+    },
+  };
+}
+
+/** Regular open plays: pair two solos, paid or not. No emails. */
+export async function pairRegularSolos(
+  openPlayId: string,
+  a: string,
+  b: string,
+  paid: boolean,
+): Promise<string | null> {
+  await requireOpenPlay(openPlayId);
+  const r = await q.pairGuestSolos(getDb(), { openPlayId, a, b, paid });
+  if ("error" in r) return r.error;
+  revalidatePath("/", "layout");
+  return null;
+}
+
+/**
+ * Regular open plays: pair every previewed couple of solos at once, paid
+ * or not. Stops at the first problem (say, the cap is full) and says how
+ * many were paired.
+ */
+export async function pairAllRegularSolos(
+  openPlayId: string,
+  couples: [string, string][],
+  paid: boolean,
+): Promise<{ made: number; error: string | null }> {
+  await requireOpenPlay(openPlayId);
+  const list = z
+    .array(z.tuple([z.uuid(), z.uuid()]))
+    .max(100)
+    .safeParse(couples);
+  if (!list.success) return { made: 0, error: "Shuffle again and retry" };
+  const db = getDb();
+  let made = 0;
+  for (const [a, b] of list.data) {
+    const r = await q.pairGuestSolos(db, { openPlayId, a, b, paid });
+    if ("error" in r) {
+      if (made) revalidatePath("/", "layout");
+      return { made, error: r.error };
+    }
+    made++;
+  }
+  revalidatePath("/", "layout");
+  return { made, error: null };
+}
+
+/** Regular open plays: fix a solo's name. */
+export async function renameRegularSolo(
+  playerId: string,
+  name: string,
+): Promise<string | null> {
+  await requireStaff();
+  const openPlayId = await q.soloGuest(getDb(), playerId);
+  if (!openPlayId) return "Player not found";
+  await requireOpenPlay(openPlayId);
+  const parsed = GuestSoloSchema.safeParse({ openPlayId, name });
+  if (!parsed.success) return firstError(parsed) ?? "Check the name";
+  const error = await q.renameGuestSolo(getDb(), playerId, parsed.data.name);
+  if (!error) revalidatePath("/", "layout");
+  return error;
+}
+
+/** Regular open plays: remove a solo who left before pairing. */
+export async function removeRegularSolo(
+  playerId: string,
+): Promise<string | null> {
+  await requireStaff();
+  const openPlayId = await q.soloGuest(getDb(), playerId);
+  if (!openPlayId) return "Player not found";
+  await requireOpenPlay(openPlayId);
+  const error = await q.removeGuestSolo(getDb(), playerId);
+  if (!error) revalidatePath("/", "layout");
+  return error;
+}
+
+/**
+ * Regular open plays: mark a pair paid (the entry fee, cash). Guests have
+ * no email, so there's no receipt. Returns an error, or null.
+ */
+export async function markRegularPaid(pairId: string): Promise<string | null> {
+  await requireStaff();
+  const openPlayId = await requirePairHost(pairId);
+  if (!openPlayId) return "Pair not found";
+  const db = getDb();
+  const play = await q.getOpenPlay(db, openPlayId);
+  if (!play) return "Open play not found";
+  if (play.kind !== "regular") return "Confirm Ranked payments with details";
+  const r = await q.confirmPairPayment(db, {
+    pairId,
+    amountCents: play.feeCents,
+    method: "cash",
+    notes: "",
+  });
+  if ("error" in r) return r.error;
+  revalidatePath("/", "layout");
+  return null;
+}
+
+/**
+ * Regular open plays: fix a pair's names ("gel/son"), or type one name to
+ * keep that player as a solo and remove the other.
+ */
+export async function renameRegularPair(
+  pairId: string,
+  names: string,
+): Promise<string | null> {
+  await requireStaff();
+  const openPlayId = await requirePairHost(pairId);
+  if (!openPlayId) return "Pair not found";
+  // One name: that player goes back to solo, the other leaves.
+  if (names.split(/[/&,]/).filter((n) => n.trim()).length === 1) {
+    const solo = GuestSoloSchema.safeParse({ openPlayId, name: names.trim() });
+    if (!solo.success) return firstError(solo) ?? "Check the name";
+    const error = await q.splitGuestPair(getDb(), pairId, solo.data.name);
+    if (!error) revalidatePath("/", "layout");
+    return error;
+  }
+  const parsed = GuestPairSchema.safeParse({ openPlayId, names });
+  if (!parsed.success) return firstError(parsed) ?? "Check the names";
+  const error = await q.renameGuestPair(getDb(), pairId, parsed.data.names);
+  if (!error) revalidatePath("/", "layout");
+  return error;
+}
+
+/** Regular open plays: mark a paid pair as not paid after all. */
+export async function markRegularUnpaid(
+  pairId: string,
+): Promise<string | null> {
+  await requireStaff();
+  if (!(await requirePairHost(pairId))) return "Pair not found";
+  const error = await q.markPairUnpaid(getDb(), pairId);
+  if (!error) revalidatePath("/", "layout");
+  return error;
+}
+
 /** Sign up a player alone; the desk pairs them later. */
 export async function registerSoloEntry(
   _prev: RegisterState,
@@ -1080,10 +1312,12 @@ export async function openPlaysOn(playDate: string) {
   const me = await requireStaff();
   const day = SessionDateSchema.safeParse(playDate);
   if (!day.success) return [];
-  return q.listOpenPlays(getDb(), {
+  const plays = await q.listOpenPlays(getDb(), {
     playDate: day.data,
     managedBy: me.role === "admin" ? undefined : me.id,
   });
+  // Ended ones are done: they show results, not a desk.
+  return plays.filter((p) => !p.ended);
 }
 
 export async function registrationsFor(openPlayId: string) {
@@ -1182,6 +1416,65 @@ export async function removePairEntry(pairId: string): Promise<string | null> {
   const error = await q.removePair(getDb(), pairId);
   if (!error) revalidatePath("/", "layout");
   return error;
+}
+
+/**
+ * The desk's edit popup: the names a player registered with. Only staff
+ * for the player (admins, or hosts of an open play they signed up for).
+ * `fullProfile`: an admin, who can also open the whole profile.
+ */
+export async function deskPlayerInfo(playerId: string): Promise<{
+  name: string;
+  firstName: string;
+  lastName: string;
+  fullProfile: boolean;
+} | null> {
+  const me = await requireStaff();
+  if (!(await staffFor(me, playerId))) return null;
+  const player = await q.getPlayer(getDb(), playerId);
+  if (!player) return null;
+  return {
+    name: player.name,
+    firstName: player.firstName,
+    lastName: player.lastName,
+    fullProfile: me.role === "admin",
+  };
+}
+
+/**
+ * Hosts fix a player's registration names (queue name, first, last) for
+ * players of their open plays. Everything else is the player's or an
+ * admin's to change.
+ */
+export async function saveRegistrationName(
+  _prev: FormState,
+  form: FormData,
+): Promise<FormState> {
+  const me = await requireStaff();
+  const parsed = RegistrationNameSchema.safeParse(Object.fromEntries(form));
+  if (!parsed.success) return { error: firstError(parsed) };
+  if (!(await staffFor(me, parsed.data.playerId))) {
+    return { error: "Only this player's hosts can change their names" };
+  }
+  const error = await q.setRegistrationName(getDb(), parsed.data);
+  if (error) return { error };
+  revalidatePath("/", "layout");
+  return { error: null, ok: true };
+}
+
+/** The pair's hosts: replace the notes kept on a pair at the desk. */
+export async function savePairNotes(
+  pairId: string,
+  notes: string,
+): Promise<string | null> {
+  await requireStaff();
+  const parsed = NotesSchema.safeParse(notes);
+  if (!parsed.success) return firstError(parsed);
+  if (!(await requirePairHost(pairId))) return "Pair not found";
+  if (!(await q.setPairNotes(getDb(), pairId, parsed.data))) {
+    return "Pair not found";
+  }
+  return null;
 }
 
 // ── Accounts: admin settings and player sign-in ───────────────────────────

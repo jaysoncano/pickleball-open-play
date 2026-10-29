@@ -121,10 +121,8 @@ export function PhotoForm({
         {src && !preview && (
           <ConfirmButton
             label="Remove photo"
-            confirmLabel="Remove?"
             onConfirm={() => startRemove(() => deletePhoto(playerId))}
             className="min-h-11 px-4 text-sm text-ink/55 hover:bg-ink/5"
-            armedClassName="min-h-11 text-sm"
           >
             {removing ? "Removing…" : "Remove photo"}
           </ConfirmButton>

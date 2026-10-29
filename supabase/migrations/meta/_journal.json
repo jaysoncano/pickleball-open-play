@@ -120,6 +120,20 @@
       "when": 1793086886954,
       "tag": "20261027074126_open_play_banners",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793250674350,
+      "tag": "20261029051114_pair_notes",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793254288856,
+      "tag": "20261029061128_open_play_kinds",
+      "breakpoints": true
     }
   ]
 }

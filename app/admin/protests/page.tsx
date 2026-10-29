@@ -135,7 +135,7 @@ async function Protests() {
                   />
                 </label>
                 <ConfirmSubmit
-                  confirmLabel="Tap again to approve"
+                  confirmLabel="Approve this protest and change the level?"
                   name="decision"
                   value="approve"
                   variant="lime"
@@ -143,7 +143,7 @@ async function Protests() {
                   ✓ Approve
                 </ConfirmSubmit>
                 <ConfirmSubmit
-                  confirmLabel="Tap again to reject"
+                  confirmLabel="Reject this protest?"
                   name="decision"
                   value="reject"
                   variant="secondary"

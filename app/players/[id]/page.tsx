@@ -10,7 +10,7 @@ import { ProtestForm } from "@/components/players/protest-form";
 import { ProtestList } from "@/components/players/protest-list";
 import { ProfileCard } from "@/components/players/profile-card";
 import { QrCard } from "@/components/profile/qr-card";
-import { currentAdmin, currentPlayer, staffFor } from "@/lib/auth-server";
+import { currentAdmin, currentPlayer } from "@/lib/auth-server";
 import { getDb } from "@/lib/db/client";
 import {
   getPlayer,
@@ -71,7 +71,8 @@ async function Profile({ params }: Pick<PageProps<"/players/[id]">, "params">) {
   // Who may protest: a signed-in player who shared an open play with them.
   const protestBlock = me ? await protestProblem(db, me.playerId, id) : null;
   const myName = me ? (await getPlayer(db, me.playerId))?.name : null;
-  const canEdit = (await staffFor(staff, id)) || me?.playerId === id;
+  // The whole profile: admins and the player. Hosts edit names at the desk.
+  const canEdit = admin || me?.playerId === id;
   const secret = await getPlayerPrivate(db, id);
   const token = admin ? secret?.claimToken : undefined;
 

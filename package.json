@@ -17,6 +17,7 @@
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
+    "db:admin": "node scripts/db-admin.mjs",
     "db:generate": "drizzle-kit generate",
     "db:studio": "open http://127.0.0.1:54323"
   },

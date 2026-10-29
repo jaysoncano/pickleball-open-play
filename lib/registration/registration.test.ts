@@ -13,7 +13,9 @@ import {
   openPlayFee,
   pairLevel,
   pairName,
+  GuestPairSchema,
   PairRegistrationSchema,
+  RegistrationNameSchema,
   PairUpSchema,
   PublicSignupSchema,
   PublicSoloSchema,
@@ -39,7 +41,7 @@ const entry = { amount: "300", method: "cash" };
 describe("PairRegistrationSchema", () => {
   it("takes one entry for both, normalizing names and emails", () => {
     expect(
-      PairRegistrationSchema.parse({ ...day, ...entry, reference: "R1" }),
+      PairRegistrationSchema.parse({ ...day, ...entry, notes: "R1" }),
     ).toEqual({
       openPlayId: OP,
       a: {
@@ -58,7 +60,7 @@ describe("PairRegistrationSchema", () => {
       },
       amountCents: 30000,
       method: "cash",
-      reference: "R1",
+      notes: "R1",
     });
   });
 
@@ -226,7 +228,7 @@ describe("online sign-up and confirmation forms", () => {
       pairId: OP,
       amountCents: 30000,
       method: "card",
-      reference: "",
+      notes: "",
     });
     expect(
       ConfirmPaymentSchema.safeParse({
@@ -268,5 +270,84 @@ describe("notReady", () => {
         }),
       ),
     ).toBe("Check in Ana & Ben first");
+  });
+
+  it("needs no check-in once the open play is live", () => {
+    const away = pair({
+      members: [
+        { name: "Ana", checkedIn: false },
+        { name: "Ben", checkedIn: false },
+      ],
+    });
+    expect(notReady(away, { live: true })).toBeNull();
+    expect(notReady(pair({ paid: false }), { live: true })).toBe(
+      "Not paid yet. Confirm the payment at the desk.",
+    );
+    expect(notReady(pair({ blocked: "Ana is Pro" }), { live: true })).toBe(
+      "Ana is Pro",
+    );
+  });
+});
+
+describe("RegistrationNameSchema", () => {
+  it("takes the queue name and first and last name, tidied", () => {
+    expect(
+      RegistrationNameSchema.parse({
+        playerId: OP,
+        name: "  Ana   C. ",
+        firstName: " Ana  Maria ",
+        lastName: "Cruz",
+      }),
+    ).toEqual({
+      playerId: OP,
+      name: "Ana C.",
+      firstName: "Ana Maria",
+      lastName: "Cruz",
+    });
+  });
+
+  it.each([
+    [{ playerId: "x", name: "Ana", firstName: "Ana", lastName: "C" }],
+    [{ playerId: OP, name: " ", firstName: "Ana", lastName: "C" }],
+    [{ playerId: OP, name: "Ana", firstName: "", lastName: "C" }],
+  ])("refuses %j", (input) => {
+    expect(RegistrationNameSchema.safeParse(input).success).toBe(false);
+  });
+});
+
+describe("GuestPairSchema", () => {
+  const guest = (names: string, extra: object = {}) =>
+    GuestPairSchema.safeParse({ openPlayId: OP, names, ...extra });
+
+  it.each([
+    ["gel/son", ["gel", "son"]],
+    ["  Gel   Cruz / son ", ["Gel Cruz", "son"]],
+    ["gel & son", ["gel", "son"]],
+    ["gel, son", ["gel", "son"]],
+  ])("reads %j as two names", (names, expected) => {
+    expect(guest(names).data).toEqual({
+      openPlayId: OP,
+      names: expected,
+      paid: false,
+      notes: "",
+    });
+  });
+
+  it("takes paid and notes", () => {
+    expect(
+      guest("gel/son", { paid: "1", notes: " own paddles " }).data,
+    ).toMatchObject({ paid: true, notes: "own paddles" });
+    expect(guest("gel/son", { paid: true }).data?.paid).toBe(true);
+    expect(guest("gel/son", { paid: "" }).data?.paid).toBe(false);
+  });
+
+  it.each([
+    ["gel", "Type two names, e.g. gel/son"],
+    ["gel/son/ivan", "Type two names, e.g. gel/son"],
+    ["", "Type two names, e.g. gel/son"],
+    ["Gel/gel", "Type two different names"],
+    [`${"x".repeat(40)}/son`, "Keep names under 30 characters"],
+  ])("refuses %j", (names, message) => {
+    expect(guest(names).error?.issues[0].message).toBe(message);
   });
 });
