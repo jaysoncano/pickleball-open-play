@@ -40,7 +40,9 @@ async function MyOpenPlays({
   await connection();
   const me = await currentAdmin();
   if (!me) redirect("/host/login");
-  const all = me.role === "admin" && (await searchParams).view === "all";
+  const query = await searchParams;
+  const all = me.role === "admin" && query.view === "all";
+  const tab = query.tab === "ended" ? "ended" : "open";
   const managedBy = all ? undefined : me.id;
   const db = getDb();
   const today = sinceYesterday();
@@ -49,7 +51,20 @@ async function MyOpenPlays({
     listOpenPlays(db, { before: today, managedBy }),
   ]);
   const live = plays.filter((p) => p.live);
-  const upcoming = plays.filter((p) => !p.live);
+  // Ended open plays move to their own tab, newest first.
+  const upcoming = plays.filter((p) => !p.live && !p.ended);
+  const notRun = past.filter((p) => !p.ended);
+  const ended = [
+    ...plays.filter((p) => p.ended).reverse(),
+    ...past.filter((p) => p.ended),
+  ];
+  const tabHref = (t: "open" | "ended") => {
+    const params = new URLSearchParams();
+    if (all) params.set("view", "all");
+    if (t === "ended") params.set("tab", "ended");
+    const qs = params.toString();
+    return qs ? `/host?${qs}` : "/host";
+  };
 
   return (
     <>
@@ -83,35 +98,74 @@ async function MyOpenPlays({
         </Link>
       </div>
 
-      {live.length > 0 && (
-        <PlaySection title="Live now" emoji="🔴" plays={live} manage />
-      )}
-      <PlaySection
-        title="Coming up"
-        emoji="🗓️"
-        plays={upcoming}
-        manage
-        empty={
-          <>
-            {all
-              ? "No open plays scheduled."
-              : "No open plays you host yet. Make one, or ask a host to invite you."}{" "}
-            <Link
-              href="/open-plays/new"
-              className="font-semibold text-fuchsia-600 underline"
+      <nav
+        aria-label="Open plays"
+        className="grid w-full grid-cols-2 gap-1.5 rounded-2xl bg-white/80 p-1.5 ring-2 ring-white sm:max-w-md"
+      >
+        {(
+          [
+            ["open", "🎾", "Active", live.length + upcoming.length],
+            ["ended", "🏁", "Ended", ended.length],
+          ] as const
+        ).map(([t, emoji, label, count]) => (
+          <Link
+            key={t}
+            href={tabHref(t)}
+            aria-current={tab === t ? "page" : undefined}
+            className={`flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 font-display text-base font-semibold whitespace-nowrap transition-colors ${tab === t ? "bg-fuchsia-500 text-white shadow-[0_3px_0_0_#a21caf]" : "text-ink/60 hover:bg-fuchsia-50 hover:text-fuchsia-600"}`}
+          >
+            <span aria-hidden>{emoji}</span>
+            {label}
+            <span
+              className={`min-w-6 rounded-full px-1.5 text-center text-sm tabular-nums ${tab === t ? "bg-white/25" : "bg-ink/5"}`}
             >
-              New open play
-            </Link>
-          </>
-        }
-      />
-      {past.length > 0 && (
+              {count}
+            </span>
+          </Link>
+        ))}
+      </nav>
+
+      {tab === "ended" ? (
         <PlaySection
-          title="Past"
-          emoji="🕰️"
-          plays={past.slice(0, PAST_LIMIT)}
+          title="Ended"
+          emoji="🏁"
+          plays={ended}
           manage
+          empty="No open plays have ended yet. End a session to see its results here."
         />
+      ) : (
+        <>
+          {live.length > 0 && (
+            <PlaySection title="Live now" emoji="🔴" plays={live} manage />
+          )}
+          <PlaySection
+            title="Coming up"
+            emoji="🗓️"
+            plays={upcoming}
+            manage
+            empty={
+              <>
+                {all
+                  ? "No open plays scheduled."
+                  : "No open plays you host yet. Make one, or ask a host to invite you."}{" "}
+                <Link
+                  href="/open-plays/new"
+                  className="font-semibold text-fuchsia-600 underline"
+                >
+                  New open play
+                </Link>
+              </>
+            }
+          />
+          {notRun.length > 0 && (
+            <PlaySection
+              title="Past"
+              emoji="🕰️"
+              plays={notRun.slice(0, PAST_LIMIT)}
+              manage
+            />
+          )}
+        </>
       )}
     </>
   );

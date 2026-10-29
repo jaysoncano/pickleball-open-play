@@ -66,8 +66,7 @@ export function SessionTimeDialog({
           </Button>
           <ConfirmSubmit
             variant="lime"
-            confirmLabel="Tap again to save"
-            warning=""
+            confirmLabel="Save changes?"
             disabled={Boolean(error) || !changed}
             onClick={() => onSave(startTime, endTime, overtime)}
           >

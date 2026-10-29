@@ -42,7 +42,8 @@ Tailwind 4, Zod 4, Drizzle ORM on Supabase Postgres (local via
   `/confirm/[token]` (receipt link), `/host/login` (hosts only),
   `/admin/login` (admins only, "Admin" nav link; admin-only pages 404 instead of
   redirecting there), `/admin/protests`,
-  `/admin/qr-codes`, `/admin/players` (Player desk: pair sign-up, payment),
+  `/admin/qr-codes`, `/admin/players` (Player desk: pick an open play, then one screen:
+  register tabs left, filterable pairs table right; `lib/registration/desk.ts`),
   `/admin/settings` (accounts and levels, password), `/login` (players).
   Host dashboard
   tabs: Courts, Profiles (check-in QR), History, Standings.
@@ -66,13 +67,27 @@ Tailwind 4, Zod 4, Drizzle ORM on Supabase Postgres (local via
   `fileProtest` (signed-in player who shared an open play) and
   `signUpOnline` (public by design; sign-ups stay
   pending until an admin confirms payment), the QR email-code actions (gated by
-  the claim token), and profile edits (`profileEditor()`: `staffFor` the
-  player, or the verified player once `hasPaidRegistration`).
+  the claim token), and profile edits (`profileEditor()`: an admin, or the
+  verified player once `hasPaidRegistration`). Hosts change only a
+  player's registration names (queue name, first, last) with
+  `saveRegistrationName` (`staffFor` the player).
 - Open plays are scheduled events with a level range; several can be
   live at once. Session actions and queries take the `openPlayId`.
+- Each open play is `regular` or `ranked` (`open_plays.kind`, picked at
+  creation, never changed). Regular: the host types pairs by name
+  ("gel/son", `GuestPairSchema` → `registerGuestPair`) as **guest**
+  players (`players.guest`: no email, one open play, kept out of the
+  directory, profiles, rankings, and app-wide name uniqueness via
+  `realNamed`; names are unique within one open play via `nameTakenIn`).
+  Ranked: the email flow (`registrationProblem` refuses Regular).
+- Once live, paid pairs join the queue on their own, at the front
+  (`addLatePairs`). After **End session** the open play shows its
+  results (`ResultsView`: top pairs, `finalStandings`, every game) and
+  can't be started again (`hasEndedSession`).
 - Payments are confirmed by hosts by hand; unpaid pairs are `pending`.
-  A pair joins the queue only when `notReady` is null (paid, right rank,
-  both checked in).
+  A pair joins the queue only when `notReady` is null: paid, right rank,
+  and, before the start, both checked in (`{ live: true }` once running:
+  no check-in).
 - Players are one record per email across open plays: registration
   links by email (`linkByEmail`), never duplicates.
 - Open play is by paid pairs: queue units are pair ids. Code that needs
@@ -84,10 +99,13 @@ Tailwind 4, Zod 4, Drizzle ORM on Supabase Postgres (local via
 - Deploys on Vercel (Hobby), functions in `bom1` next to Supabase
   (`vercel.json`). See README "Deploy".
 - Engine functions take `now` and `rng` as arguments.
-- Destructive buttons use `ConfirmButton` (two taps), never `confirm()`.
-  Saves that change or replace data use `ConfirmSubmit` (two taps, checks
-  the form first); a dropdown or file pick that saves asks inline first.
-  Live dashboard moves (queue order, swaps, court rank, rename) stay one tap.
+- Every edit, update, and delete confirms in a popup (`ConfirmDialog`),
+  never `confirm()`: destructive buttons use `ConfirmButton` (asks
+  "{label}?"), saves use `ConfirmSubmit` (checks the form, then asks
+  `confirmLabel`). Creating or recording something new (a sign-up, a
+  pairing, a game's score) saves in one tap with a plain `Button`. A
+  dropdown or file pick that saves asks inline first. Live dashboard moves
+  (queue order, swaps, court rank, rename) stay one tap.
 
 ## Local email
 
@@ -97,7 +115,8 @@ http://127.0.0.1:54324 (`MAILPIT_URL`), started by `npm run db:start`.
 ## Sample data
 
 `supabase/seed.sql` loads on `npm run db:reset` (dates relative to
-today): accounts `admin` / `pop-admin-123`; hosts `makati.host`,
+today): accounts `admin` / `pop-admin-123` (`npm run db:admin` switches
+it to `ADMIN_PASSWORD` from `.env.local`); hosts `makati.host`,
 `bgc.host`, `pending.host` (unverified) / `pop-host-123`; players
 `maria`, `juan` / `pop-player-123`. "Riverside Courts" (today) is already
 running with two games on court for hosts to score. Fixed ids per table prefix
@@ -107,8 +126,10 @@ running with two games on court for hosts to score. Fixed ids per table prefix
 
 `npm run dev` (`scripts/dev.mjs`: starts Supabase if needed, applies new
 migrations, Next on port 1027 or the next free one, never 3000–3010,
+always on the local database even if `.env.local` names the hosted one,
 opens the app, Mailpit, and Supabase Studio;
 `-- --no-open` skips the browser) · `npm run dev:next` (plain `next dev`) ·
 `npm run db:start` · `npm test` · `npm run coverage` (85%
 on `lib/`) · `npm run lint` · `npm run typecheck` · `npm run format:check` ·
-`npm run build` · `npm run db:generate` · `npm run db:reset`
+`npm run build` · `npm run db:generate` · `npm run db:reset` ·
+`npm run db:admin`

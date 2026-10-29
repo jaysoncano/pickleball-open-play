@@ -21,7 +21,6 @@ export function RemoveOpenPlay({
     <>
       <ConfirmButton
         label="Remove this open play"
-        confirmLabel="Remove?"
         onConfirm={() =>
           start(async () => {
             const error = await removeOpenPlay(id);
@@ -30,7 +29,6 @@ export function RemoveOpenPlay({
           })
         }
         className="min-h-11 px-4 text-sm text-ink/55 hover:bg-ink/5"
-        armedClassName="min-h-11 text-sm"
       >
         {pending ? "Removing…" : "Remove"}
       </ConfirmButton>

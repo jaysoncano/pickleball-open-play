@@ -35,13 +35,18 @@ describe("OpenPlaySchema", () => {
       levels: ["beginner", "novice"],
       maxPairs: null,
       feeCents: 30000,
+      kind: "ranked",
     });
     expect(OpenPlaySchema.parse({ ...base, maxPairs: "12" }).maxPairs).toBe(12);
+    expect(OpenPlaySchema.parse({ ...base, kind: "regular" }).kind).toBe(
+      "regular",
+    );
     expect(OpenPlaySchema.parse(base).maxPairs).toBeNull();
   });
 
   it.each([
     [{ ...base, levels: [] }, "Tick at least one rank"],
+    [{ ...base, kind: "league" }, "Pick Regular or Ranked"],
     [{ ...base, venue: "  " }, "Enter the venue name"],
     [{ ...base, location: "" }, "Enter the location"],
     [
@@ -52,6 +57,8 @@ describe("OpenPlaySchema", () => {
     [{ ...base, maxPairs: "2.5" }, "Max pairs must be a whole number"],
     [{ ...base, maxPairs: "999" }, "Up to 200 pairs"],
     [{ ...base, fee: "-1" }, "Fee can't be negative"],
+    [{ ...base, fee: "0" }, "Enter the entry fee per pair"],
+    [{ ...base, fee: "" }, "Enter the entry fee per pair"],
     [{ ...base, levels: ["legend"] }, "Pick a level"],
   ])("rejects %j", (input, message) => {
     expect(OpenPlaySchema.safeParse(input).error?.issues[0].message).toBe(

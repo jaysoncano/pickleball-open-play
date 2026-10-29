@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  useEffect,
   useRef,
   useState,
   type ComponentProps,
@@ -9,62 +8,65 @@ import {
   type ReactNode,
 } from "react";
 import { Button } from "./button";
-
-const RESET_AFTER_MS = 5000;
+import { ConfirmDialog } from "./confirm-dialog";
 
 /**
- * Two-tap submit for saves that change or replace data. The first tap
- * checks the form and asks to confirm; the second submits it. Pressing
- * Enter in a field counts as a tap, so it can't save by accident either.
- * Disarms itself after a few seconds or when focus leaves.
+ * Submit for saves that change or replace data. The tap checks the form,
+ * then asks in a popup; confirming submits it. Pressing Enter in a field
+ * counts as a tap, so it can't save by accident either.
  */
 export function ConfirmSubmit({
   children,
-  confirmLabel = "Tap again to save",
-  warning = "This can't be undone.",
+  confirmLabel = "Save these changes?",
+  warning,
+  confirmText,
   onClick,
   className = "",
   ...button
 }: Omit<ComponentProps<typeof Button>, "type" | "children"> & {
   children: ReactNode;
-  confirmLabel?: ReactNode;
-  /** Shown next to the armed button. Empty to hide it. */
-  warning?: string;
+  /** The popup's question, e.g. "Save the venue?". */
+  confirmLabel?: string;
+  /** Shown under the question. */
+  warning?: ReactNode;
+  /** The popup's confirm button; defaults to this button's own text. */
+  confirmText?: ReactNode;
 }) {
-  const [armed, setArmed] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  useEffect(() => () => clearTimeout(timer.current), []);
+  const [asking, setAsking] = useState(false);
+  const self = useRef<HTMLButtonElement>(null);
+  // Set while the confirmed click goes through to the form.
+  const confirmed = useRef(false);
 
   function handleClick(event: MouseEvent<HTMLButtonElement>) {
-    clearTimeout(timer.current);
-    if (armed) {
-      setArmed(false);
+    if (confirmed.current) {
+      confirmed.current = false;
       onClick?.(event);
       return;
     }
     event.preventDefault();
     const form = event.currentTarget.form;
     if (form && !form.reportValidity()) return;
-    setArmed(true);
-    timer.current = setTimeout(() => setArmed(false), RESET_AFTER_MS);
+    setAsking(true);
   }
 
   return (
     <span className={`inline-flex flex-wrap items-center gap-2 ${className}`}>
-      <Button
-        {...button}
-        type="submit"
-        variant={armed ? "danger" : button.variant}
-        onClick={handleClick}
-        onBlur={() => setArmed(false)}
-      >
-        {armed ? confirmLabel : children}
+      <Button {...button} ref={self} type="submit" onClick={handleClick}>
+        {children}
       </Button>
-      {armed && warning && (
-        <span role="status" className="text-sm font-semibold text-rose-600">
-          {warning}
-        </span>
+      {asking && (
+        <ConfirmDialog
+          title={confirmLabel}
+          warning={warning}
+          confirmText={confirmText ?? children}
+          danger={button.variant === "danger"}
+          onCancel={() => setAsking(false)}
+          onConfirm={() => {
+            setAsking(false);
+            confirmed.current = true;
+            self.current?.click();
+          }}
+        />
       )}
     </span>
   );

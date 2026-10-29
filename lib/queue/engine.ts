@@ -427,6 +427,31 @@ export function addPlayers(
   id: IdFactory = makeId,
   rng: Rng = Math.random,
 ): QueueState {
+  return add(state, names, now, id, rng, false);
+}
+
+/**
+ * Pairs who paid after the start: they haven't played yet, so they go to
+ * the front of the queue, keeping games balanced.
+ */
+export function addLatePairs(
+  state: QueueState,
+  names: PlayerEntry[],
+  now: number,
+  id: IdFactory = makeId,
+  rng: Rng = Math.random,
+): QueueState {
+  return add(state, names, now, id, rng, true);
+}
+
+function add(
+  state: QueueState,
+  names: PlayerEntry[],
+  now: number,
+  id: IdFactory,
+  rng: Rng,
+  front: boolean,
+): QueueState {
   const fresh = names
     .filter((e) => nameKey(entryName(e)) && !isNameTaken(state, entryName(e)))
     .map((e) => newPlayer(e, now, id));
@@ -438,7 +463,9 @@ export function addPlayers(
         ...state.players,
         ...Object.fromEntries(fresh.map((p) => [p.id, p])),
       },
-      queue: [...state.queue, ...fresh.map((p) => p.id)],
+      queue: front
+        ? [...fresh.map((p) => p.id), ...state.queue]
+        : [...state.queue, ...fresh.map((p) => p.id)],
     },
     rng,
   );

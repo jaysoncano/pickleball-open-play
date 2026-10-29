@@ -7,9 +7,6 @@ import { Modal } from "@/components/ui/modal";
 import type { Court, Player } from "@/lib/queue/schema";
 import { firstError } from "@/lib/queue/schema";
 import { MAX_SCORE, ScoreSchema, type Score } from "@/lib/ranking/forms";
-import { ConfirmSubmit } from "@/components/ui/confirm-submit";
-
-const QUICK = [11, 15, 21];
 
 /**
  * Enter the final score when a game ends. The match is recorded with it,
@@ -85,28 +82,6 @@ export function ScoreDialog({
           </div>
         ))}
 
-        <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-ink/60">
-          Winner got
-          {QUICK.map((n) => (
-            <span key={n} className="flex gap-1">
-              {(["A", "B"] as const).map((side, i) => (
-                <button
-                  key={side}
-                  type="button"
-                  onClick={() => {
-                    const next: [string, string] = [...scores];
-                    next[i] = String(n);
-                    setScores(next);
-                  }}
-                  className="min-h-9 rounded-full bg-fuchsia-100 px-3 font-display text-fuchsia-700 hover:bg-fuchsia-200"
-                >
-                  {side} {n}
-                </button>
-              ))}
-            </span>
-          ))}
-        </div>
-
         {touched && !parsed.success && (
           <p role="status" className="text-sm font-semibold text-rose-600">
             {firstError(parsed)}
@@ -117,13 +92,10 @@ export function ScoreDialog({
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <ConfirmSubmit
-            confirmLabel="Tap again to record it"
-            variant="lime"
-            disabled={!parsed.success}
-          >
+          {/* Recording a new result saves in one tap; only edits confirm. */}
+          <Button type="submit" variant="lime" disabled={!parsed.success}>
             Save result ✓
-          </ConfirmSubmit>
+          </Button>
         </div>
       </form>
     </Modal>

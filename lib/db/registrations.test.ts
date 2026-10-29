@@ -9,7 +9,9 @@ import {
   PairUpSchema,
   PublicSignupSchema,
   PublicSoloSchema,
+  RegistrationNameSchema,
   SoloRegistrationSchema,
+  UnpaidPairSchema,
 } from "@/lib/registration/forms";
 import {
   OpenPlayEditSchema,
@@ -26,6 +28,9 @@ import {
   listOpenPlays,
   listRegistrations,
   liveSessionGames,
+  hasEndedSession,
+  openPlayGames,
+  openPlayMatches,
   endSession,
   pairMembers,
   confirmPairPayment,
@@ -40,6 +45,8 @@ import {
   registerSolo,
   removeOpenPlay,
   setLevel,
+  setPairNotes,
+  setRegistrationName,
   startSession,
   updateOpenPlay,
   updateProfile,
@@ -59,6 +66,7 @@ let ana: string;
 let op: string;
 
 const play = (over: Partial<OpenPlayInput> = {}): OpenPlayInput => ({
+  kind: "ranked",
   venue: "Sunrise Courts",
   location: "Makati",
   playDate: DAY,
@@ -152,7 +160,7 @@ describe("open plays", () => {
 
 describe("registerPair", () => {
   it("registers an existing and a new player with one entry", async () => {
-    const r = await okPair(anaP(), person("Ben"), { reference: "R1" });
+    const r = await okPair(anaP(), person("Ben"), { notes: "R1" });
     expect(r.players.map((p) => p.name)).toEqual(["Ana", "Ben"]);
     expect(await getPlayer(db, ana)).toMatchObject({
       firstName: "Ana",
@@ -170,7 +178,7 @@ describe("registerPair", () => {
         id: r.pairId,
         amountCents: 30000,
         method: "cash",
-        reference: "R1",
+        notes: "R1",
         members: [
           expect.objectContaining({ name: "Ana" }),
           expect.objectContaining({ name: "Ben" }),
@@ -466,9 +474,26 @@ describe("pairs as queue units", () => {
     );
     expect(g.sideA).toEqual([game.playerIds[0]]);
     expect([g.scoreA, g.scoreB]).toEqual([11, 7]);
+    expect(await hasEndedSession(db, op)).toBe(false);
+    expect(await getOpenPlay(db, op)).toMatchObject({
+      live: true,
+      ended: false,
+    });
     await endSession(db, op);
+    expect(await getOpenPlay(db, op)).toMatchObject({
+      live: false,
+      ended: true,
+    });
     expect(await liveSessionGames(db, op)).toEqual([]);
     expect(await liveSessionGames(db, "junk")).toEqual([]);
+    // Ended: the results keep every game and match record.
+    expect(await hasEndedSession(db, op)).toBe(true);
+    expect(await openPlayGames(db, op)).toEqual([g]);
+    const [record] = await openPlayMatches(db, op);
+    expect([record.scoreA, record.scoreB]).toEqual([11, 7]);
+    expect(record.players).toHaveLength(4);
+    expect(await openPlayMatches(db, "junk")).toEqual([]);
+    expect(await hasEndedSession(db, "junk")).toBe(false);
   });
 });
 
@@ -620,7 +645,7 @@ describe("online sign-up and payment approval", () => {
       pairId,
       amount: "300",
       method: "ewallet",
-      reference: "G1",
+      notes: "G1",
     });
 
   it("waits as pending, then joins the queue when the admin confirms", async () => {
@@ -648,7 +673,7 @@ describe("online sign-up and payment approval", () => {
     expect(day.pairs[0]).toMatchObject({
       amountCents: 30000,
       method: "ewallet",
-      reference: "G1",
+      notes: "G1",
     });
     expect(await paidPairs(db, op)).toHaveLength(1);
     expect(await hasPaidRegistration(db, kim)).toBe(true);
@@ -853,6 +878,85 @@ describe("online sign-up and payment approval", () => {
     );
     expect(await removePair(db, paid.pairId!)).toBe(
       "This open play is running; remove the pair after it ends",
+    );
+  });
+});
+
+describe("pair notes", () => {
+  const unpaid = (notes: string) =>
+    UnpaidPairSchema.parse({
+      openPlayId: op,
+      notes,
+      a: person("Kim"),
+      b: person("Lee"),
+    });
+  const pay = (pairId: string, notes = "") =>
+    ConfirmPaymentSchema.parse({
+      pairId,
+      amount: "300",
+      method: "cash",
+      notes,
+    });
+
+  it("keeps notes on an unpaid pair, through to payment", async () => {
+    const r = await registerPair(db, unpaid("pays at 7"));
+    if ("error" in r) throw new Error(r.error);
+    expect((await listRegistrations(db, op)).pending[0].notes).toBe(
+      "pays at 7",
+    );
+    await confirmPairPayment(db, pay(r.pairId!));
+    expect((await listRegistrations(db, op)).pairs[0].notes).toBe("pays at 7");
+  });
+
+  it("takes new notes typed when confirming the payment", async () => {
+    const r = await registerPair(db, unpaid("pays at 7"));
+    if ("error" in r) throw new Error(r.error);
+    await confirmPairPayment(db, pay(r.pairId!, "paid by Kim"));
+    expect((await listRegistrations(db, op)).pairs[0].notes).toBe(
+      "paid by Kim",
+    );
+  });
+
+  it("replaces a pair's notes, and says when there's no such pair", async () => {
+    const r = await okPair(anaP(), person("Ben"));
+    expect(await setPairNotes(db, r.pairId!, "own paddles")).toBe(true);
+    expect((await listRegistrations(db, op)).pairs[0].notes).toBe(
+      "own paddles",
+    );
+    expect(await setPairNotes(db, r.pairId!, "")).toBe(true);
+    expect((await listRegistrations(db, op)).pairs[0].notes).toBe("");
+    expect(await setPairNotes(db, MISSING, "x")).toBe(false);
+    expect(await setPairNotes(db, "not-a-uuid", "x")).toBe(false);
+  });
+});
+
+describe("setRegistrationName", () => {
+  const names = (playerId: string, name: string) =>
+    RegistrationNameSchema.parse({
+      playerId,
+      name,
+      firstName: "Ana",
+      lastName: "Reyes",
+    });
+
+  it("changes the queue name and first and last name", async () => {
+    expect(await setRegistrationName(db, names(ana, "Ana R."))).toBeNull();
+    expect(await getPlayer(db, ana)).toMatchObject({
+      name: "Ana R.",
+      firstName: "Ana",
+      lastName: "Reyes",
+    });
+    // Keeping its own name (any case) is fine.
+    expect(await setRegistrationName(db, names(ana, "ana r."))).toBeNull();
+  });
+
+  it("refuses a name another player has, and a missing player", async () => {
+    await ensurePlayers(db, ["Ben"]);
+    expect(await setRegistrationName(db, names(ana, "BEN"))).toBe(
+      "BEN is already registered",
+    );
+    expect(await setRegistrationName(db, names(MISSING, "Zed"))).toBe(
+      "Player not found",
     );
   });
 });

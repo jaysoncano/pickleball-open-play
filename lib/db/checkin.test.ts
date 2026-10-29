@@ -17,7 +17,7 @@ import {
   paidPairs,
   registerPair,
   rosterPairs,
-  setCheckIn,
+  setPairCheckIn,
   signUpPair,
   type Db,
 } from "./queries";
@@ -28,6 +28,7 @@ let host: string;
 let op: string;
 
 const play = (over: Partial<OpenPlayInput> = {}): OpenPlayInput => ({
+  kind: "ranked",
   venue: "Sunrise Courts",
   location: "Makati",
   playDate: "2026-10-27",
@@ -76,7 +77,8 @@ describe("unpaid pairs and check-in", () => {
     ]);
     expect(await paidPairs(db, op)).toEqual([]);
 
-    expect(await setCheckIn(db, op, ana.id, true)).toBe(true);
+    // One tap checks the whole pair in.
+    expect(await setPairCheckIn(db, op, r.pairId!, true)).toBe(true);
     expect(await rosterPairs(db, op)).toEqual([
       {
         id: r.pairId,
@@ -86,7 +88,7 @@ describe("unpaid pairs and check-in", () => {
         paid: false,
         members: [
           { id: ana.id, name: "Ana", checkedIn: true },
-          { id: ben.id, name: "Ben", checkedIn: false },
+          { id: ben.id, name: "Ben", checkedIn: true },
         ],
       },
     ]);
@@ -96,22 +98,28 @@ describe("unpaid pairs and check-in", () => {
         pairId: r.pairId!,
         amountCents: 30000,
         method: "cash",
-        reference: "",
+        notes: "",
       }),
     );
-    await setCheckIn(db, op, ben.id, true);
     expect(await paidPairs(db, op)).toMatchObject([
       {
         paid: true,
         members: [{ checkedIn: true }, { checkedIn: true }],
       },
     ]);
-    // Undo, and unknown players.
-    await setCheckIn(db, op, ben.id, false);
-    expect((await paidPairs(db, op))[0].members[1].checkedIn).toBe(false);
-    expect(await setCheckIn(db, op, "junk", true)).toBe(false);
+    // Undo for both, and unknown pairs.
+    await setPairCheckIn(db, op, r.pairId!, false);
     expect(
-      await setCheckIn(db, op, "00000000-0000-4000-8000-000000000000", true),
+      (await paidPairs(db, op))[0].members.map((m) => m.checkedIn),
+    ).toEqual([false, false]);
+    expect(await setPairCheckIn(db, op, "junk", true)).toBe(false);
+    expect(
+      await setPairCheckIn(
+        db,
+        op,
+        "00000000-0000-4000-8000-000000000000",
+        true,
+      ),
     ).toBe(false);
   });
 

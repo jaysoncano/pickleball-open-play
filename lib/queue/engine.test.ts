@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   addCourt,
+  addLatePairs,
   addPlayers,
   courtStatus,
   createSession,
@@ -477,6 +478,20 @@ describe("addPlayers", () => {
     expect(addPlayers(s, ["a", "  ", "B "], NOW)).toBe(s);
     expect(isNameTaken(s, " j ")).toBe(true);
     expect(isNameTaken(s, "Zed")).toBe(false);
+  });
+});
+
+describe("addLatePairs", () => {
+  it("puts late arrivals at the front of the queue", () => {
+    let s = session(["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]);
+    expect(names(s, s.queue)).toEqual(["I", "J"]);
+    s = addLatePairs(s, ["K", "L"], NOW, makeId, zero);
+    expect(names(s, s.queue)).toEqual(["K", "L", "I", "J"]);
+  });
+
+  it("skips names already in the session", () => {
+    const s = session(ten);
+    expect(addLatePairs(s, ["a"], NOW)).toBe(s);
   });
 });
 

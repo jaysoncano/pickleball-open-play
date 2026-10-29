@@ -106,10 +106,7 @@ export function BannerForm({ play }: { play: BannerPlay }) {
         )
       )}
       <div className="flex flex-wrap gap-2">
-        <ConfirmSubmit
-          confirmLabel="Tap again to replace banner"
-          disabled={pending}
-        >
+        <ConfirmSubmit confirmLabel="Replace banner?" disabled={pending}>
           {pending && !removing ? "Saving…" : "Save banner"}
         </ConfirmSubmit>
         {play.bannerUpdatedAt && (
@@ -117,7 +114,6 @@ export function BannerForm({ play }: { play: BannerPlay }) {
             label="Remove the banner"
             onConfirm={remove}
             className="min-h-11 rounded-2xl px-4 font-semibold text-ink/60 ring-2 ring-ink/10 hover:text-rose-600"
-            armedClassName="bg-rose-500 text-white ring-rose-500"
           >
             Remove banner
           </ConfirmButton>

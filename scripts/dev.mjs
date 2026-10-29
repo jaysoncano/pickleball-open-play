@@ -2,11 +2,13 @@
 // running and apply any new migrations (data is kept), run Next on port
 // 1027 (or the next free one, never 3000–3010), then open the app, the
 // Mailpit inbox, and Supabase Studio (browse tables) in the browser.
-// `npm run dev -- --no-open` skips the browser; `npm run dev:next` is
-// plain `next dev`.
+// Always on the local Supabase database, whatever DATABASE_URL .env.local
+// holds. `npm run dev -- --no-open` skips the browser; `npm run dev:next`
+// is plain `next dev` (uses .env.local as is).
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import net from "node:net";
+import { LOCAL_DB } from "./local-db.mjs";
 
 const FIRST_PORT = 1027;
 const AVOID = { from: 3000, to: 3010 };
@@ -89,9 +91,12 @@ console.log(
 );
 console.log(`▶ Mailpit: ${mailpit}`);
 console.log(`▶ Studio:  ${studio}  (browse tables and data)`);
+console.log(`▶ Database: local (${LOCAL_DB.replace(/:[^:@]*@/, ":***@")})`);
 
+// Real env vars win over .env files in Next, so this beats .env.local.
 const next = spawn("npx", ["next", "dev", "--port", String(port)], {
   stdio: "inherit",
+  env: { ...process.env, DATABASE_URL: LOCAL_DB },
 });
 next.on("exit", (code) => process.exit(code ?? 0));
 // Ctrl+C reaches Next too (same process group); just wait for it to exit.

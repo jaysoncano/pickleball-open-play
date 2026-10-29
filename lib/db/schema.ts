@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   customType,
   date,
   integer,
@@ -18,6 +19,7 @@ import type { QueueState } from "@/lib/queue/schema";
 import { PROTEST_STATUSES } from "@/lib/ranking/forms";
 import { LEVELS } from "@/lib/ranking/levels";
 import { PAYMENT_METHODS } from "@/lib/registration/forms";
+import { OPEN_PLAY_KINDS } from "@/lib/registration/open-play";
 
 // RLS is on with no policies: the app connects as the database owner, and
 // Supabase's public API (anon key) can't read or write these tables.
@@ -30,6 +32,7 @@ export const handEnum = pgEnum("hand", HANDS);
 export const paymentMethodEnum = pgEnum("payment_method", PAYMENT_METHODS);
 export const pairStatusEnum = pgEnum("pair_status", ["pending", "paid"]);
 export const accountRoleEnum = pgEnum("account_role", ROLES);
+export const openPlayKindEnum = pgEnum("open_play_kind", OPEN_PLAY_KINDS);
 
 const bytea = customType<{ data: Uint8Array; driverData: Uint8Array }>({
   dataType: () => "bytea",
@@ -62,10 +65,18 @@ export const players = pgTable(
     /** Sign-in: set by the player once their payment is confirmed. */
     username: text("username"),
     passwordHash: text("password_hash"),
+    /**
+     * A name typed for one Regular open play ("gel/son"): no email, no
+     * profile, left out of the directory and rankings. Names only need to
+     * be unique among real players.
+     */
+    guest: boolean("guest").notNull().default(false),
     createdAt: createdAt(),
   },
   (t) => [
-    uniqueIndex("players_name_key").on(sql`lower(${t.name})`),
+    uniqueIndex("players_name_key")
+      .on(sql`lower(${t.name})`)
+      .where(sql`not ${t.guest}`),
     uniqueIndex("players_username_key").on(t.username),
     uniqueIndex("players_email_key").on(t.email),
     uniqueIndex("players_claim_token_key").on(t.claimToken),
@@ -150,6 +161,12 @@ export const openPlays = pgTable("open_plays", {
   maxPairs: integer("max_pairs"),
   /** Entry for one pair, in minor units. */
   feeCents: integer("fee_cents").notNull().default(0),
+  /**
+   * Regular: the host types pairs by name ("gel/son"), stats stay in this
+   * open play. Ranked: players sign up with email, and games count toward
+   * their shared record.
+   */
+  kind: openPlayKindEnum("kind").notNull().default("ranked"),
   /** Set when a banner is uploaded (it versions the image URL). */
   bannerUpdatedAt: timestamp("banner_updated_at", { withTimezone: true }),
   createdAt: createdAt(),
@@ -216,7 +233,8 @@ export const pairs = pgTable("pairs", {
   /** Payment: set when paid. */
   amountCents: integer("amount_cents"),
   method: paymentMethodEnum("method"),
-  reference: text("reference").notNull().default(""),
+  /** The host's own notes on the pair ("paid half", "late"); never emailed. */
+  notes: text("notes").notNull().default(""),
   paidAt: timestamp("paid_at", { withTimezone: true }),
   createdAt: createdAt(),
 }).enableRLS();

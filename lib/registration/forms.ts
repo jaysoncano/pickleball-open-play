@@ -21,6 +21,19 @@ export const METHOD_LABEL: Record<PaymentMethod, string> = {
 
 export const MAX_FEE = 100_000;
 
+/**
+ * What a host may change on a player: the names used to register them
+ * (queue name and first and last name). The rest is the player's, or an
+ * admin's, to edit.
+ */
+export const RegistrationNameSchema = z.object({
+  playerId: z.uuid("Pick a player"),
+  name: PlayerNameSchema.transform((n) => n.replace(/\s+/g, " ")),
+  ...NameFields,
+});
+
+export type RegistrationName = z.infer<typeof RegistrationNameSchema>;
+
 /** One player at the booth: an existing player or a new name. */
 const PersonSchema = z
   .object({
@@ -37,6 +50,69 @@ const PersonSchema = z
 
 export type Person = z.infer<typeof PersonSchema>;
 
+/** The host's notes on a pair: kept at the desk, never emailed. */
+export const MAX_NOTES = 200;
+export const NotesSchema = z
+  .string()
+  .trim()
+  .max(MAX_NOTES, `Keep notes under ${MAX_NOTES} characters`)
+  .default("");
+
+/**
+ * A Regular open play's pair, typed in one line: "gel/son". Also takes
+ * "gel & son" or "gel, son". Names only: no email, no account.
+ */
+export const GuestPairSchema = z
+  .object({
+    openPlayId: z.uuid("Pick an open play"),
+    names: z.string("Type the pair, e.g. gel/son").trim(),
+    /** The open play's rank they join; its lowest when not picked. */
+    rank: z.union([z.literal(""), LevelSchema]).optional(),
+    paid: z
+      .union([z.literal("1"), z.literal(""), z.boolean()])
+      .default(false)
+      .transform((v) => v === true || v === "1"),
+    notes: NotesSchema,
+  })
+  .transform((r, ctx) => {
+    const people = r.names
+      .split(/\s*(?:\/|&|,)\s*/)
+      .map((n) => n.replace(/\s+/g, " ").trim())
+      .filter(Boolean);
+    const issue = (message: string) => {
+      ctx.addIssue({ code: "custom", message, path: ["names"] });
+      return z.NEVER;
+    };
+    if (people.length !== 2) return issue("Type two names, e.g. gel/son");
+    for (const p of people) {
+      const name = PlayerNameSchema.safeParse(p);
+      if (!name.success) return issue(name.error.issues[0].message);
+    }
+    if (nameKey(people[0]) === nameKey(people[1])) {
+      return issue("Type two different names");
+    }
+    return {
+      openPlayId: r.openPlayId,
+      names: people as [string, string],
+      rank: r.rank || undefined,
+      paid: r.paid,
+      notes: r.notes,
+    };
+  });
+
+export type GuestPair = z.infer<typeof GuestPairSchema>;
+
+/** A Regular open play's player who came alone: a name to pair later. */
+export const GuestSoloSchema = z
+  .object({
+    openPlayId: z.uuid("Pick an open play"),
+    name: PlayerNameSchema.transform((n) => n.replace(/\s+/g, " ")),
+    rank: z.union([z.literal(""), LevelSchema]).optional(),
+  })
+  .transform((r) => ({ ...r, rank: r.rank || undefined }));
+
+export type GuestSolo = z.infer<typeof GuestSoloSchema>;
+
 /** The pair's entry fee, paid in full at the booth. */
 const OpenPlayId = z.uuid("Pick an open play");
 
@@ -47,7 +123,7 @@ const EntryFields = {
     .min(0, "Amount can't be negative")
     .max(MAX_FEE, "That amount looks too high"),
   method: z.enum(PAYMENT_METHODS, "Pick how they paid"),
-  reference: z.string().trim().max(80, "Reference is too long").default(""),
+  notes: NotesSchema,
 };
 
 const toCents = <T extends { amount: number }>({ amount, ...rest }: T) => ({
@@ -76,7 +152,12 @@ export type PairRegistration = z.infer<typeof PairRegistrationSchema>;
 
 /** A pair registered at the desk who will pay later; the host confirms it. */
 export const UnpaidPairSchema = z
-  .object({ openPlayId: OpenPlayId, a: PersonSchema, b: PersonSchema })
+  .object({
+    openPlayId: OpenPlayId,
+    notes: NotesSchema,
+    a: PersonSchema,
+    b: PersonSchema,
+  })
   .refine((r) => !samePerson(r.a, r.b), {
     message: "Pick two different players with different emails",
     path: ["b"],
@@ -156,7 +237,7 @@ export const ConfirmPaymentSchema = z
     pairId: z.uuid("Pick a pair"),
     amount: EntryFields.amount,
     method: EntryFields.method,
-    reference: EntryFields.reference,
+    notes: EntryFields.notes,
   })
   .transform(toCents);
 

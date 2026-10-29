@@ -6,7 +6,12 @@ import { BannerField } from "@/components/open-plays/banner-forms";
 import { Button } from "@/components/ui/button";
 import { dateInput } from "@/lib/queue/time";
 import { LEVEL_INFO, LEVELS, type Level } from "@/lib/ranking/levels";
-import { MAX_PAIRS, ranksLabel } from "@/lib/registration/open-play";
+import {
+  KIND_INFO,
+  MAX_PAIRS,
+  OPEN_PLAY_KINDS,
+  ranksLabel,
+} from "@/lib/registration/open-play";
 import type { Venue } from "@/lib/roles";
 import { useNow } from "@/lib/use-now";
 
@@ -57,6 +62,7 @@ export function CreateOpenPlay({
         Open play details
       </h2>
       <form action={action} className="flex flex-col gap-4">
+        <KindField />
         <BannerField play={NEW_PLAY} />
         <VenueFields venues={venues} />
         <GroupFields group={group} />
@@ -318,19 +324,51 @@ export function ScheduleFields({ defaults }: { defaults: ScheduleDefaults }) {
             className={INPUT}
           />
         </Field>
-        <Field label="Entry per pair">
+        <Field label="Entry per pair (shown to players)">
           <input
             name="fee"
             type="number"
             inputMode="decimal"
-            min={0}
+            min={0.01}
             step="0.01"
             required
-            defaultValue={defaults.fee}
+            defaultValue={defaults.fee || undefined}
+            placeholder="e.g. 300"
             className={INPUT}
           />
         </Field>
       </div>
     </>
+  );
+}
+
+/** Regular (names only) or Ranked (shared record). Fixed once created. */
+function KindField() {
+  return (
+    <fieldset className="flex flex-col gap-2">
+      <legend className="mb-1 text-sm font-bold text-ink/60">
+        Type of open play
+      </legend>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {OPEN_PLAY_KINDS.map((k, i) => (
+          <label
+            key={k}
+            className="flex cursor-pointer flex-col gap-1 rounded-2xl bg-white p-3 ring-2 ring-ink/10 has-checked:bg-fuchsia-50 has-checked:ring-fuchsia-400"
+          >
+            <span className="flex items-center gap-2 font-display text-lg font-bold">
+              <input
+                type="radio"
+                name="kind"
+                value={k}
+                defaultChecked={i === 0}
+                className="size-5 accent-fuchsia-500"
+              />
+              {KIND_INFO[k].label}
+            </span>
+            <span className="text-sm text-ink/60">{KIND_INFO[k].blurb}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }

@@ -48,7 +48,7 @@ export function EditOpenPlayForm({ play }: { play: OpenPlay }) {
         )
       )}
       <ConfirmSubmit
-        confirmLabel="Tap again to save changes"
+        confirmLabel="Save changes?"
         disabled={pending}
         className="self-start"
       >

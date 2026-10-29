@@ -75,10 +75,10 @@ insert into open_play_invites (open_play_id, email, invited_by) values
 
 -- ── Pairs and registrations ────────────────────────────────────────────────
 
-insert into pairs (id, open_play_id, status, amount_cents, method, reference, paid_at) values
+insert into pairs (id, open_play_id, status, amount_cents, method, notes, paid_at) values
   -- Last week.
   ('d0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000001', 'paid', 30000, 'cash', '', now() - interval '7 days'),
-  ('d0000000-0000-4000-8000-000000000002', 'c0000000-0000-4000-8000-000000000001', 'paid', 30000, 'ewallet', 'GC-10021', now() - interval '7 days'),
+  ('d0000000-0000-4000-8000-000000000002', 'c0000000-0000-4000-8000-000000000001', 'paid', 30000, 'ewallet', 'GCash GC-10021', now() - interval '7 days'),
   ('d0000000-0000-4000-8000-000000000003', 'c0000000-0000-4000-8000-000000000001', 'paid', 30000, 'cash', '', now() - interval '7 days'),
   ('d0000000-0000-4000-8000-000000000004', 'c0000000-0000-4000-8000-000000000001', 'paid', 30000, 'card', '4242', now() - interval '7 days'),
   ('d0000000-0000-4000-8000-000000000005', 'c0000000-0000-4000-8000-000000000001', 'paid', 30000, 'cash', '', now() - interval '7 days'),
@@ -248,7 +248,7 @@ insert into open_plays (id, venue, location, created_by, play_date, start_time, 
 insert into open_play_hosts (open_play_id, admin_id) values
   ('c0000000-0000-4000-8000-000000000005', 'a0000000-0000-4000-8000-000000000003');
 
-insert into pairs (id, open_play_id, status, amount_cents, method, reference, paid_at)
+insert into pairs (id, open_play_id, status, amount_cents, method, notes, paid_at)
 select ('d0000000-0000-4000-8000-0000000000' || n)::uuid, 'c0000000-0000-4000-8000-000000000005',
        'paid', 25000, 'cash', '', now() - interval '2 hours'
 from unnest(array['17', '18', '19', '20', '21', '22']) as n;

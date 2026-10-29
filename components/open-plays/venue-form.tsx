@@ -39,7 +39,7 @@ export function VenueForm({
         )
       )}
       <ConfirmSubmit
-        confirmLabel="Tap again to save venue"
+        confirmLabel="Save venue?"
         disabled={pending}
         className="self-start"
       >

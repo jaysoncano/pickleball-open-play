@@ -50,7 +50,7 @@ export function ChangeLevelForm({
         />
       </label>
       <ConfirmSubmit
-        confirmLabel="Tap again to change level"
+        confirmLabel="Change level?"
         variant="secondary"
         disabled={pending}
       >

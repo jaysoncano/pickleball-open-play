@@ -24,7 +24,7 @@ import {
   venueSuggestions,
 } from "@/lib/db/queries";
 import { formatMoney, openPlayFee } from "@/lib/registration/forms";
-import { spotsLeft, whenLabel } from "@/lib/registration/open-play";
+import { spotsLeft, whenLabel, KIND_INFO } from "@/lib/registration/open-play";
 import { ROLE_INFO, venueLabel } from "@/lib/roles";
 
 export const metadata: Metadata = { title: "Manage open play" };
@@ -101,6 +101,9 @@ async function Manage({ params }: Pick<Props, "params">) {
               {whenLabel(play)}
             </h1>
             <p className="font-semibold text-ink/60">
+              <span className="mr-2 rounded-full bg-fuchsia-100 px-2 py-0.5 text-sm font-bold text-fuchsia-800">
+                {KIND_INFO[play.kind].label}
+              </span>
               {venueLabel(play) || "Venue to be announced"}
             </p>
           </div>

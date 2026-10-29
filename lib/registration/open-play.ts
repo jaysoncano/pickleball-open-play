@@ -13,6 +13,27 @@ import { MAX_FEE } from "./forms";
 
 export const MAX_PAIRS = 200;
 
+/**
+ * Regular: the host types each pair's names ("gel/son") at the desk; no
+ * email, stats stay in that open play. Ranked: players sign up with their
+ * details and every game counts toward their shared record.
+ */
+export const OPEN_PLAY_KINDS = ["regular", "ranked"] as const;
+export type OpenPlayKind = (typeof OPEN_PLAY_KINDS)[number];
+
+export const KIND_INFO: Record<OpenPlayKind, { label: string; blurb: string }> =
+  {
+    regular: {
+      label: "Regular",
+      blurb: "Type pairs by name (gel/son). No email. Stats stay here.",
+    },
+    ranked: {
+      label: "Ranked",
+      blurb:
+        "Players sign up with email. Games count toward their level and record across open plays.",
+    },
+  };
+
 /** When, which ranks, how many pairs, and the entry: set and edited. */
 const scheduleFields = {
   playDate: SessionDateSchema,
@@ -33,9 +54,12 @@ const scheduleFields = {
         .nullable(),
     )
     .default(null),
+  // Required: players see the entry before they sign up. A blank field
+  // coerces to 0, so it gets the same message.
   fee: z.coerce
     .number("Enter the entry fee")
     .min(0, "Fee can't be negative")
+    .gt(0, "Enter the entry fee per pair")
     .max(MAX_FEE, "That fee looks too high"),
 };
 
@@ -54,7 +78,12 @@ function toCents<T extends { fee: number }>({ fee, ...o }: T) {
 
 /** What the admin fills in to schedule an open play. */
 export const OpenPlaySchema = z
-  .object({ ...VenueSchema.shape, ...scheduleFields })
+  .object({
+    ...VenueSchema.shape,
+    ...scheduleFields,
+    // Picked when scheduling; it doesn't change afterwards.
+    kind: z.enum(OPEN_PLAY_KINDS, "Pick Regular or Ranked").default("ranked"),
+  })
   .refine(differentTimes.check, differentTimes.error)
   .transform(toCents);
 

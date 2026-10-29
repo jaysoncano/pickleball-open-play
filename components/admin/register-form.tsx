@@ -1,6 +1,12 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import {
+  useActionState,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   registerPairEntry,
   registerSoloEntry,
@@ -10,7 +16,14 @@ import { Button } from "@/components/ui/button";
 import { PROFILE_LIMITS } from "@/lib/profile/forms";
 import { nameKey } from "@/lib/queue/names";
 import { MAX_NAME_LENGTH } from "@/lib/queue/schema";
-import { EntryFields, INPUT, type Fee } from "./entry-fields";
+import { splitName } from "@/lib/registration/desk";
+import {
+  EntryFields,
+  INPUT,
+  NotesField,
+  type EntryDefaults,
+  type Fee,
+} from "./entry-fields";
 
 export type KnownPlayer = {
   id: string;
@@ -22,7 +35,7 @@ export type KnownPlayer = {
 
 /**
  * One player's fields. Typing a registered name links that player and
- * fills in what's on file; any other name registers someone new.
+ * fills in what's on file; a new name fills first and last name from it.
  */
 function PersonFields({
   prefix,
@@ -38,6 +51,8 @@ function PersonFields({
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
+  // Once the host types a first or last name, stop filling it in.
+  const [typed, setTyped] = useState(false);
 
   function pick(value: string) {
     setName(value);
@@ -46,6 +61,10 @@ function PersonFields({
       setFirstName(found.firstName);
       setLastName(found.lastName);
       setEmail(found.email);
+    } else if (!typed) {
+      const split = splitName(value);
+      setFirstName(split.firstName);
+      setLastName(split.lastName);
     }
   }
 
@@ -71,60 +90,58 @@ function PersonFields({
         value={match?.id ?? ""}
       />
       <input type="hidden" name={`${prefix}_name`} value={match ? "" : name} />
-      <label className="flex flex-col gap-1">
-        <span className="text-sm font-bold text-ink/60">Name on the queue</span>
+      <input
+        list="desk-known-players"
+        required
+        maxLength={MAX_NAME_LENGTH}
+        autoComplete="off"
+        aria-label={`${label}: name on the queue`}
+        value={name}
+        onChange={(e) => pick(e.target.value)}
+        placeholder="Name on the queue (search or new)"
+        className={INPUT}
+      />
+      <div className="grid grid-cols-2 gap-2">
         <input
-          list="desk-known-players"
+          name={`${prefix}_firstName`}
           required
-          maxLength={MAX_NAME_LENGTH}
+          maxLength={PROFILE_LIMITS.firstName}
           autoComplete="off"
-          value={name}
-          onChange={(e) => pick(e.target.value)}
-          placeholder="Search or type a new name"
+          aria-label={`${label}: first name`}
+          placeholder="First name"
+          value={firstName}
+          onChange={(e) => {
+            setTyped(true);
+            setFirstName(e.target.value);
+          }}
           className={INPUT}
         />
-      </label>
-      <div className="grid gap-2 sm:grid-cols-2">
-        <label className="flex flex-col gap-1">
-          <span className="text-sm font-bold text-ink/60">First name</span>
-          <input
-            name={`${prefix}_firstName`}
-            required
-            maxLength={PROFILE_LIMITS.firstName}
-            autoComplete="off"
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
-            className={INPUT}
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-sm font-bold text-ink/60">Last name</span>
-          <input
-            name={`${prefix}_lastName`}
-            required
-            maxLength={PROFILE_LIMITS.lastName}
-            autoComplete="off"
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
-            className={INPUT}
-          />
-        </label>
-      </div>
-      <label className="flex flex-col gap-1">
-        <span className="text-sm font-bold text-ink/60">
-          Email{" "}
-          <span className="font-semibold text-ink/40">(receipt goes here)</span>
-        </span>
         <input
-          name={`${prefix}_email`}
-          type="email"
+          name={`${prefix}_lastName`}
           required
-          maxLength={PROFILE_LIMITS.email}
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          maxLength={PROFILE_LIMITS.lastName}
+          autoComplete="off"
+          aria-label={`${label}: last name`}
+          placeholder="Last name"
+          value={lastName}
+          onChange={(e) => {
+            setTyped(true);
+            setLastName(e.target.value);
+          }}
           className={INPUT}
         />
-      </label>
+      </div>
+      <input
+        name={`${prefix}_email`}
+        type="email"
+        required
+        maxLength={PROFILE_LIMITS.email}
+        aria-label={`${label}: email (receipt goes here)`}
+        placeholder="Email (receipt goes here)"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        className={INPUT}
+      />
     </fieldset>
   );
 }
@@ -138,6 +155,35 @@ export function Done({ state }: { state: RegisterState }) {
     );
   }
   if (!state.done) return null;
+  if (state.done.guest && state.done.solo) {
+    return (
+      <p
+        role="status"
+        className="rounded-2xl bg-sky-100 px-4 py-3 text-sm font-semibold text-sky-900"
+      >
+        ✓ {state.done.names[0]} added as solo. Pair them from the list (filter{" "}
+        <b>Solo</b>).
+      </p>
+    );
+  }
+  if (state.done.guest) {
+    return (
+      <p
+        role="status"
+        className={`rounded-2xl px-4 py-3 text-sm font-semibold ${state.done.unpaid ? "bg-rose-100 text-rose-900" : "bg-lime-100 text-lime-900"}`}
+      >
+        ✓ {state.done.names.join(" & ")} added
+        {state.done.unpaid ? (
+          <>
+            {" "}
+            as <b>UNPAID</b>. Mark them paid when they pay.
+          </>
+        ) : (
+          " as paid."
+        )}
+      </p>
+    );
+  }
   if (state.done.unpaid) {
     return (
       <p
@@ -145,7 +191,7 @@ export function Done({ state }: { state: RegisterState }) {
         className="rounded-2xl bg-rose-100 px-4 py-3 text-sm font-semibold text-rose-900"
       >
         ✓ {state.done.names.join(" & ")} registered as <b>UNPAID</b>. Confirm
-        their payment below when they pay; receipts go out then.
+        their payment in the list when they pay; receipts go out then.
       </p>
     );
   }
@@ -162,110 +208,181 @@ export function Done({ state }: { state: RegisterState }) {
   );
 }
 
-const MODES = {
-  pair: "Pair · paid now",
-  later: "Pair · pay later",
-  solo: "Solo, needs partner",
+// Pay later first: most pairs register, then pay when they're ready.
+const TABS = {
+  later: "Pay later",
+  pair: "Paid now",
+  solo: "Solo",
+  players: "Players",
 } as const;
+type Tab = keyof typeof TABS;
+
+const STORE = "pop.desk";
+
+/** Per-device memory of the last payment method, per open play. */
+function readStore(): { entry?: Record<string, EntryDefaults> } {
+  try {
+    return JSON.parse(localStorage.getItem(STORE) ?? "{}");
+  } catch {
+    return {};
+  }
+}
+
+function writeStore(next: ReturnType<typeof readStore>) {
+  try {
+    localStorage.setItem(STORE, JSON.stringify({ ...readStore(), ...next }));
+  } catch {
+    // Private mode or blocked storage: the form still works, just forgets.
+  }
+}
 
 /**
- * Register a pair (paid now, or unpaid until the host confirms) or a solo
- * player looking for a partner.
+ * The desk's left column: register a pair (paid now or later) or a solo
+ * player, or find any player to edit. Opens on "Pay later"; the amount is
+ * the open play's fee, and the last payment method is remembered here.
  */
-export function RegisterForm({
-  openPlay,
+export function DeskForms({
+  openPlayId,
   fee,
   known,
   onSaved,
+  players,
 }: {
-  openPlay: { id: string; label: string };
+  openPlayId: string;
   fee: Fee;
   known: KnownPlayer[];
-  /** Called after each successful sign-up, to refresh the day's list. */
+  /** Called after each successful sign-up, to refresh the list. */
   onSaved: () => void;
+  /** The "Players" tab: the player directory. No tab without it. */
+  players?: ReactNode;
 }) {
-  const [mode, setMode] = useState<keyof typeof MODES>("pair");
-  const [pairState, pairAction, pairPending] = useActionState<
-    RegisterState,
-    FormData
-  >(registerPairEntry, { error: null });
-  const [soloState, soloAction, soloPending] = useActionState<
-    RegisterState,
-    FormData
-  >(registerSoloEntry, { error: null });
+  const [tab, setTab] = useState<Tab>("later");
+  const [defaults, setDefaults] = useState<EntryDefaults | undefined>();
+  const [loaded, setLoaded] = useState(false);
   useEffect(() => {
-    if (pairState.done || soloState.done) onSaved();
-  }, [pairState.done, soloState.done, onSaved]);
-  const solo = mode === "solo";
-  const state = solo ? soloState : pairState;
-  const pending = solo ? soloPending : pairPending;
-  // A fresh form after each success, so the next pair starts blank.
-  const formKey = `${mode}-${solo ? soloState.done?.names : pairState.done?.names}`;
-  const later = mode === "later";
+    const saved = readStore();
+    /* eslint-disable react-hooks/set-state-in-effect -- browser storage loads after hydration */
+    setDefaults(saved.entry?.[openPlayId]);
+    setLoaded(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [openPlayId]);
+
+  const tabs = (Object.keys(TABS) as Tab[]).filter(
+    (t) => t !== "players" || players,
+  );
+
+  function remember(next: EntryDefaults) {
+    setDefaults(next);
+    writeStore({ entry: { ...readStore().entry, [openPlayId]: next } });
+  }
 
   return (
     <section
-      aria-labelledby="register-title"
-      className="rounded-[2rem] bg-white/80 p-4 ring-2 ring-white backdrop-blur sm:p-5"
+      aria-label="Register"
+      className="flex flex-col gap-3 rounded-[2rem] bg-white/80 p-3 ring-2 ring-white backdrop-blur sm:p-4"
     >
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 id="register-title" className="font-display text-2xl font-bold">
-          <span aria-hidden>📝</span> Register
-          <span className="mt-1 block text-base font-semibold text-ink/55">
-            {openPlay.label}
-          </span>
-        </h2>
-        <div
-          role="radiogroup"
-          aria-label="Sign-up type"
-          className="flex gap-1 rounded-2xl bg-ink/5 p-1"
-        >
-          {(Object.keys(MODES) as (keyof typeof MODES)[]).map((m) => (
-            <button
-              key={m}
-              type="button"
-              role="radio"
-              aria-checked={mode === m}
-              onClick={() => setMode(m)}
-              className={`min-h-10 rounded-xl px-3 font-display font-semibold ${mode === m ? "bg-white shadow" : "text-ink/60"}`}
-            >
-              {MODES[m]}
-            </button>
-          ))}
-        </div>
+      <div
+        role="tablist"
+        aria-label="Sign-up type"
+        className={`grid gap-1 rounded-2xl bg-ink/5 p-1 ${tabs.length === 4 ? "grid-cols-4" : "grid-cols-3"}`}
+      >
+        {tabs.map((t) => (
+          <button
+            key={t}
+            type="button"
+            role="tab"
+            aria-selected={tab === t}
+            onClick={() => setTab(t)}
+            className={`min-h-10 rounded-xl px-1 font-display text-sm font-semibold sm:text-base ${tab === t ? "bg-white shadow" : "text-ink/60 hover:text-ink"}`}
+          >
+            {TABS[t]}
+          </button>
+        ))}
       </div>
+      {tab === "players" ? (
+        players
+      ) : (
+        <RegisterForm
+          key={`${tab}-${loaded}`}
+          mode={tab}
+          openPlayId={openPlayId}
+          fee={fee}
+          known={known}
+          defaults={defaults}
+          onDefaults={remember}
+          onSaved={onSaved}
+        />
+      )}
+    </section>
+  );
+}
+
+function RegisterForm({
+  mode,
+  openPlayId,
+  fee,
+  known,
+  defaults,
+  onDefaults,
+  onSaved,
+}: {
+  mode: Exclude<Tab, "players">;
+  openPlayId: string;
+  fee: Fee;
+  known: KnownPlayer[];
+  defaults?: EntryDefaults;
+  onDefaults: (next: EntryDefaults) => void;
+  onSaved: () => void;
+}) {
+  const solo = mode === "solo";
+  const later = mode === "later";
+  const [state, action, pending] = useActionState<RegisterState, FormData>(
+    solo ? registerSoloEntry : registerPairEntry,
+    { error: null },
+  );
+  // Once per successful save, even if the caller passes a new callback
+  // each render (it may re-render us as a result).
+  const latest = useRef(onSaved);
+  useEffect(() => {
+    latest.current = onSaved;
+  });
+  useEffect(() => {
+    if (state.done) latest.current();
+  }, [state.done]);
+  // A fresh form after each success, so the next pair starts blank.
+  const formKey = String(state.done?.names);
+
+  return (
+    <>
       <datalist id="desk-known-players">
         {known.map((p) => (
           <option key={p.id} value={p.name} />
         ))}
       </datalist>
-      <form
-        key={formKey}
-        action={solo ? soloAction : pairAction}
-        className="flex flex-col gap-3"
-      >
-        <input type="hidden" name="openPlayId" value={openPlay.id} />
+      <form key={formKey} action={action} className="flex flex-col gap-3">
+        <input type="hidden" name="openPlayId" value={openPlayId} />
         {later && <input type="hidden" name="payLater" value="1" />}
-        <div className={`grid gap-3 ${solo ? "" : "md:grid-cols-2"}`}>
-          <PersonFields
-            prefix="a"
-            label={solo ? "Player" : "Player 1"}
-            known={known}
-          />
-          {!solo && <PersonFields prefix="b" label="Player 2" known={known} />}
-        </div>
+        <PersonFields
+          prefix="a"
+          label={solo ? "Player" : "Player 1"}
+          known={known}
+        />
+        {!solo && <PersonFields prefix="b" label="Player 2" known={known} />}
         {later ? (
-          <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-900 ring-2 ring-rose-200">
-            Saved as <b>UNPAID</b>: they can check in, but join the queue only
-            after you confirm their payment.
-          </p>
+          <>
+            <NotesField />
+            <p className="rounded-2xl bg-rose-50 px-3 py-2 text-sm text-rose-900 ring-2 ring-rose-200">
+              Saved as <b>UNPAID</b>. They join the queue once you confirm the
+              payment in the list.
+            </p>
+          </>
         ) : solo ? (
-          <p className="rounded-2xl bg-sky-50 px-4 py-3 text-sm text-sky-900">
-            No payment yet. Pair them with another solo player below; the pair
-            then pays the full entry.
+          <p className="rounded-2xl bg-sky-50 px-3 py-2 text-sm text-sky-900">
+            No payment yet. Pair them with another solo player in the list
+            (filter <b>Solo</b>); the pair then pays the full entry.
           </p>
         ) : (
-          <EntryFields fee={fee} />
+          <EntryFields fee={fee} defaults={defaults} onChange={onDefaults} />
         )}
         <Done state={state} />
         <Button type="submit" disabled={pending}>
@@ -278,6 +395,6 @@ export function RegisterForm({
                 : "Record entry & email receipts"}
         </Button>
       </form>
-    </section>
+    </>
   );
 }

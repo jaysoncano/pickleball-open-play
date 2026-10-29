@@ -85,10 +85,8 @@ export function RemoveHost({
   return (
     <ConfirmButton
       label={`Remove host ${username}`}
-      confirmLabel="Remove?"
       onConfirm={() => start(() => removeHost(openPlayId, adminId))}
       className="min-h-11 px-3 text-sm text-ink/55 hover:bg-ink/5"
-      armedClassName="min-h-11 text-sm"
     >
       {busy ? "…" : "Remove"}
     </ConfirmButton>
@@ -107,10 +105,9 @@ export function CancelInvite({
   return (
     <ConfirmButton
       label={`Cancel the invitation for ${email}`}
-      confirmLabel="Cancel?"
+      confirmText="Cancel invitation"
       onConfirm={() => start(() => removeInvite(openPlayId, email))}
       className="min-h-11 px-3 text-sm text-ink/55 hover:bg-ink/5"
-      armedClassName="min-h-11 text-sm"
     >
       {busy ? "…" : "Cancel"}
     </ConfirmButton>

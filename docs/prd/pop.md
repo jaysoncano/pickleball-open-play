@@ -109,6 +109,68 @@ and a picked profile photo waits for **Save photo**. Live court moves
 (queue order, swaps, court rank, renames) stay one tap so games keep
 moving; they can be changed back.
 
+## Two kinds of open play: Regular and Ranked
+
+Picked when scheduling (Regular is the default); it doesn't change
+afterwards. The Manage page, desk, and results show which it is.
+
+|                | **Regular**                                                                             | **Ranked**                                                                           |
+| -------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Sign-up        | The host types each pair in one line: `gel/son` (also `gel & son`, `gel, son`)          | Queue name, first and last name, email for each player                               |
+| Email          | None                                                                                    | Required: receipts and profile link                                                  |
+| Online sign-up | No: the public page says to join at the booth                                           | Yes                                                                                  |
+| Paid / unpaid  | A **Paid** box when adding; **✓ Mark paid** (entry fee, cash) and **Mark unpaid** later | **✓ Mark paid** with amount, method, notes                                           |
+| Queue          | Paid pairs only                                                                         | Paid pairs only                                                                      |
+| Check-in       | Same as Ranked                                                                          | Before the start only                                                                |
+| Stats          | Kept for that open play (History, Standings, results); nothing on player profiles       | Saved to each player's record, shared across open plays (levels, protests, rankings) |
+
+- Regular desk form has two tabs: **👥 Pair** (`gel/son`, **Paid
+  already** box, notes) and **🙋 Solo** (one name, for someone who came
+  alone). When the open play runs more than one rank, **Rank they join**
+  chips (e.g. Beginner | Novice) pick the queue line; the choice stays for
+  the next entry. (Ranked open plays take each player's own level.) Solos wait under the list's **Solo** filter. Each solo row has
+  **🎲 Random partner** (draws one of the other solos) and **Pick
+  partner**; both open a popup to choose (or **🎲 Shuffle**) the partner,
+  then **🤝 Pair up**: Regular ticks **Paid already** or not, Ranked
+  records the full entry. A solo's **Edit** fixes the name or removes
+  them before pairing.
+- **🎲 Pair all solos (n)** (in the table header, shown with more than two
+  solos while the list shows All or Solo) previews every solo
+  paired at random, numbered; **🎲 Shuffle** redraws everyone (who
+  waits, with an odd count, changes too). **⏸ Hold** on a name leaves that
+  player out of this round (listed under **On hold**, **▶ Include** brings
+  them back); holding or including reshuffles the rest. One **All paid already** box (Regular) or one
+  entry (Ranked) applies to every pair, then **🤝 Pair them all**.
+- Typing **one name** in a Regular pair's **Names** splits it: that
+  player goes back to solo, the other is removed with the pair and its
+  payment (not while the pair is in a running queue).
+- Hosts **fix a Regular pair's names** in the row's **Edit** popup
+  (**Names**, typed like `gel/son`; saving asks first). A running queue
+  shows the new names.
+- Regular names are **guests**: they belong to that open play only, never
+  show in the player directory, rankings, or profiles. **Names are
+  unique within an open play** (any case): adding, renaming, or splitting
+  into a name already there tells the host ("Gel is already in this open
+  play"). Another open play, or a real player, can use the same name.
+
+## End of an open play
+
+- **End session** asks in a popup. Confirming closes the open play for
+  good: its page shows the **results** instead of setting it up again,
+  for hosts (from My open plays) and the public alike:
+  - **Top pairs** (🥇🥈🥉),
+  - **Rankings**: every pair that joined, highest to lowest by the
+    Standings point system; pairs that never played are last,
+  - **Every game**, in order, as a table: game number, court, duration,
+    both pairs, the score.
+- An ended open play **leaves the lists** and takes no more sign-ups:
+  it's not on the Player desk's open play picker (an old desk link opens
+  its results), and it's no longer in Open plays
+  (home), Coming up, or a group's upcoming ones (it moves to the group's
+  Past). **My open plays** has two tabs, **🎾 Active** (Live now, Coming
+  up, Past ones that never ran) and **🏁 Ended (n)**, which opens each
+  one's results. Its card shows "🏁 Ended · results".
+
 ## Open plays by rank
 
 - **Pages:** the home page (`/`) is public: Live now and Coming up, with
@@ -122,7 +184,9 @@ moving; they can be changed back.
   removing one from its Manage page goes back to My open plays.
 - Staff **schedule open plays** at `/open-plays/new`: **venue name and
   location**, date, start and end time, the **ranks** it runs (tick one or more levels, e.g.
-  Beginner and Novice), an optional **max pairs**, and the entry per pair.
+  Beginner and Novice), an optional **max pairs**, and the **entry per
+  pair (required, above 0)**, so players see the price on the open play
+  cards and page before they join. Editing keeps it required.
 - **Venue autocomplete:** venues saved with past open plays are
   suggested (one per name, newest first; a host sees their own open
   plays' venues, an admin all). Picking a saved venue fills in its
@@ -171,24 +235,53 @@ moving; they can be changed back.
    at the booth. A taken name only matches that player when the
    email is the one on file. The sign-up shows as **Pending payment**
    (also on the public roster as "Awaiting payment"). No email yet.
-2. They pay at the management booth. On the Player desk, **Pending
-   payments** lists them per open play; the admin taps **Confirm
-   payment** (amount, method, reference) or **Reject**.
+2. They pay at the management booth. On the Player desk they show as
+   **Unpaid** rows (filter **Unpaid**); the host taps **Confirm
+   payment** (amount, method, notes) or **Reject**.
 3. Confirming checks rank and capacity again, marks the pair paid (it
    counts toward the cap and can join the queue), and emails both players
    the receipt with their profile link.
 4. **Profile editing opens only after a confirmed payment** (QR code,
    "This is me", receipt link, saving info or photo). Admins can always
    edit, and can remove a pair (refund) while its open play isn't running.
+   **Hosts** change only the names a player registered with (queue name,
+   first and last name), for players of their own open plays; email,
+   phone, photo, and the rest stay the player's (or an admin's).
 
 - Players join **as a pair** for one open play. One **entry for the pair,
   paid in full** (no split payments): amount (default `OPEN_PLAY_FEE`),
-  method (cash, e-wallet, card at the booth), optional reference.
-- The **Player desk** (`/admin/players`): pick the date, then the open
-  play (rank, time, spots left), then register a pair: each player is
-  picked from registered players or added as new (queue name, first name,
-  last name, email — all required). The amount defaults to that open
-  play's entry.
+  method (cash, e-wallet, card at the booth), optional **notes**.
+- **Notes** are the host's own (e.g. "paid half", "own paddles"): on any
+  pair, paid or unpaid, editable from the list, never emailed.
+- The **Player desk** (`/admin/players`) has two steps:
+  1. Pick the date and the open play (rank, time, spots left). Each one
+     opens its own desk (`?openPlay=…`, with **← Change** back).
+  2. The desk fits one screen, no page scrolling; each column scrolls on
+     its own. On phones a **Sign up | List** switch shows one at a time,
+     the list shows cards instead of a table, and the filters scroll
+     sideways. A bar on top shows paid and unpaid
+     counts, money collected, and spots left.
+     - **Left, tabs:** **Pay later** (unpaid, first), **Paid now**, **Solo**,
+       and **Players** (find anyone to edit or show their QR). Each player
+       is picked from registered players or added as new (queue name,
+       first name, last name, email — all required). A new queue name
+       fills first and last name ("Ana Maria Cruz" → Ana Maria / Cruz).
+       The amount is always the open play's entry fee (with no fee set, the
+       desk says so and links to Manage); the desk remembers the last
+       payment method on that device and opens on **Pay later**.
+     - **Right, the list:** one row per pair, paid or unpaid, and solo
+       players, as a table: players (level, check-in), payment (Paid with
+       amount and method, or Unpaid) with the **date and time**, and
+       notes. Filter **All / Paid / Unpaid / Notes / Solo** (with counts)
+       and search names or notes. Each row has one small **Edit** button;
+       unpaid rows also **✓ Mark paid** (a popup with the amount from the
+       fee, method, and notes; confirming there marks the pair paid and
+       emails receipts), and solo rows **Pick**, two at a time, to pair up.
+     - **Edit** opens a popup with tabs: **Pair** (payment status, notes,
+       reject or remove) and one tab per player with their
+       registration names only (queue name, first, last). Admins also get
+       a link to the full profile. The **Players** tab's Edit opens the
+       same names form.
 - A player who comes alone signs up **solo** (no payment yet). The desk
   picks two solos, pairs them, and records the pair's full entry.
 - After each sign-up, every player gets an email: receipt (date, partner,
@@ -210,10 +303,21 @@ moving; they can be changed back.
   Each recorded game is stored per player, so individual stats and
   ranking keep working.
 - Same live dashboard: courts, up next, queue, drag to reorder, swap,
-  pause, overtime alerts, history tab. **Late arrivals**: pairs paid at the
-  desk for this open play appear under the queue (refreshes every 20 s).
-- **Game done** asks the host for the **final score** (no ties; quick
-  picks 11, 15, 21). Scores are entered by hand, only by the open play's
+  pause, overtime alerts, history tab. **Late arrivals**: pairs signed up
+  for this open play who aren't in the queue show under it in **Not in
+  the queue yet** (refreshes every 20 s). It's running, so **no
+  check-in**: once a pair is paid, it **joins the queue on its own, at the
+  front** (it hasn't played yet, so games stay balanced). Unpaid pairs fold into one line ("⚠️ 2 unpaid pairs ·
+  Review & confirm") that opens a popup to **✓ Mark paid** each one. **＋ New pair** registers a pair right there (the desk's
+  form: Pay later, Paid now, Solo); they wait in that list until added.
+- **Courts** show side A over side B with a **VS** line between; each pair
+  is a full-width row with both players' avatars and names in full.
+- **Rankings so far** appears under the courts once every pair has
+  played a game: every pair best first (🥇🥈🥉 highlighted), both
+  players' names, rating, W–L, and point difference. It refreshes as
+  scores come in.
+- **Game done** asks the host for the **final score** (no ties), typed
+  in for each pair. Scores are entered by hand, only by the open play's
   hosts (creator, co-hosts) or an admin; players and the public board
   can't. Saving records the match with each player's current level.
 - **Standings** tab (hosts only): pairs ranked by a **point system**,
@@ -304,6 +408,14 @@ person to verify an email through a code claims that profile.
 - `/admin/protests` lists pending protests with the player's record beside
   each. Approve (moves the level) or reject, with a note the player sees.
 
+## Confirmations
+
+- Every edit, update, and delete asks in a **popup** ("Remove host
+  jo?", "Save the venue?") with **Go back** and the action, so it's clear
+  what's being confirmed. Removals are red. Creating or recording
+  something new (a sign-up, pairing solos, a game's final score) saves
+  in one tap.
+
 ## Payments, check-in, and shared players
 
 - **Every payment is confirmed by a host by hand.** At the desk a pair is
@@ -313,11 +425,14 @@ person to verify an email through a code claims that profile.
   the desk ("Unpaid · confirm payment"), solos waiting for a partner are
   marked unpaid, and the check-in list highlights unpaid pairs in rose.
 - **Check-in before queuing:** the first setup step is **Check-in**: every
-  pair (paid and unpaid) with a button per player; tap as they arrive.
-  A pair can be added to the queue only when it's **paid and both players
-  are checked in** ("✓ Ready"); the server refuses anything else. The
-  live dashboard's late-arrivals panel uses the same check-in list. The
-  desk's paid list shows "✓ Checked in" or "1/2 checked in".
+  pair (paid and unpaid) with **one button for the pair** ("○ Son & Gel ·
+  Check in"): one tap checks both players in, tapping again undoes both.
+  Before the start a pair can be added to the queue only when it's
+  **paid and checked in** ("✓ Ready"); the server refuses anything else.
+  Check-in applies only before the start: once the open play is running,
+  a paid pair can be added without it. Before the start the desk's list
+  shows "✓ Checked in" or "○ Not checked in" per pair; once it's running,
+  that status is hidden.
 - **Players are shared across open plays and groups.** A player is one
   record identified by email: registering someone (desk or online) with
   an email already on a player links that player, keeping their name,

@@ -1,12 +1,13 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { endOpenPlay, finishMatch, renameAndSave } from "@/app/actions";
 import { useSessionStore } from "@/components/session-provider";
 import { useState } from "react";
 import { levelRank, type Level } from "@/lib/ranking/levels";
 import {
   addCourt,
-  addPlayers,
+  addLatePairs,
   editSchedule,
   setOvertimeLimit,
   finishGame,
@@ -37,6 +38,7 @@ import { MatchHistory } from "./match-history";
 import { PlayerStatsTable } from "./player-stats-table";
 import { ProfilesPanel } from "./profiles-panel";
 import { SessionDate } from "./session-date";
+import { RankingsPreview } from "./rankings-preview";
 import { StandingsPanel } from "./standings-panel";
 import { QueueList } from "./queue-list";
 import { SessionBar } from "./session-bar";
@@ -57,7 +59,8 @@ export function Dashboard({
   ranks?: Level[];
 }) {
   // Apply an engine change now; it saves to the database in the background.
-  const { update: act, replace, saveError, openPlayId } = useSessionStore();
+  const { update: act, saveError, openPlayId } = useSessionStore();
+  const router = useRouter();
   const now = useNow();
   const [scoringCourt, setScoringCourt] = useState<string | null>(null);
   const [tab, setTab] = useState<
@@ -112,7 +115,8 @@ export function Dashboard({
         onEditTime={() => setEditingTime(true)}
         onEnd={async () => {
           await endOpenPlay(openPlayId);
-          replace(null);
+          // The page reloads as the open play's results, not its setup.
+          router.refresh();
         }}
       />
 
@@ -204,6 +208,11 @@ export function Dashboard({
               </button>
             </li>
           </ul>
+          <RankingsPreview
+            openPlayId={openPlayId}
+            session={session}
+            active={tab === "courts"}
+          />
         </section>
 
         <aside className="flex flex-col gap-5">
@@ -235,7 +244,8 @@ export function Dashboard({
               <LatePairs
                 openPlayId={openPlayId}
                 inSession={Object.keys(session.players)}
-                onAdd={(pairs) => act((s, t) => addPlayers(s, pairs, t))}
+                // Paid late: first in line, so games stay balanced.
+                onAdd={(pairs) => act((s, t) => addLatePairs(s, pairs, t))}
               />
             </div>
             <QueueList

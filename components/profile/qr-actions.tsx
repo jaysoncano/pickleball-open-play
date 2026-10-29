@@ -25,10 +25,10 @@ export function NewQrButton({
   return (
     <ConfirmButton
       label={`Make a new QR code for ${name}`}
-      confirmLabel="Void old code?"
+      warning="The old QR code stops working."
+      confirmText="Make new code"
       onConfirm={() => start(() => newQrCode(playerId))}
       className="min-h-11 px-4 text-sm text-ink/60 hover:bg-ink/5"
-      armedClassName="min-h-11 text-sm"
     >
       {pending ? "Making…" : "New code"}
     </ConfirmButton>

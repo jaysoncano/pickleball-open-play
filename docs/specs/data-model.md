@@ -8,25 +8,25 @@ as the database owner; the Supabase anon/public API sees nothing.
 
 ## Tables
 
-| Table               | Holds                                                                                                                     |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `players`           | name (unique, case-insensitive), `level`, profile fields                                                                  |
-| `player_photos`     | player (pk), `mime`, `data` bytea                                                                                         |
-| `admins`            | staff: `username`, `password_hash`, `role`, `email` + `email_verified_at` (self sign-up), `group_name`, `logo_updated_at` |
-| `account_codes`     | admin, `code_hash`, `attempts`, `expires_at`: host email verification                                                     |
-| `open_play_banners` | open play (pk, cascade), `mime`, `data` bytea; `open_plays.banner_updated_at` versions `/banners/[id]`                    |
-| `group_logos`       | admin (pk), `mime`, `data` bytea                                                                                          |
-| `open_play_invites` | open play + email (pk), `invited_by`: email invitations to host, claimed on verification                                  |
-| `open_plays`        | `venue`, `location`, `created_by` (account), date, start/end, `levels`, `max_pairs`, fee                                  |
-| `open_play_hosts`   | open play + account (pk together): hosts invited to help run it                                                           |
-| `pairs`             | open play, entry `amount_cents`, `method`, `reference`                                                                    |
-| `registrations`     | player, open play (unique together), `pair_id` (null = solo), `checked_in_at`                                             |
-| `email_codes`       | player, email, `code_hash`, `attempts`, `expires_at`                                                                      |
-| `sessions`          | open play, `status` active/ended, window, `state` jsonb                                                                   |
-| `matches`           | session, court, start/end, `score_a`, `score_b`                                                                           |
-| `match_players`     | match, player, `side` A/B, `name` and `level` at match time                                                               |
-| `protests`          | player, current → requested level, reason, status, admin note, `filed_by` (signed-in player)                              |
-| `level_changes`     | player, from → to, note, optional `protest_id`                                                                            |
+| Table               | Holds                                                                                                                       |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `players`           | name (unique among non-guests, case-insensitive), `level`, profile fields, `guest` (a Regular open play's name-only player) |
+| `player_photos`     | player (pk), `mime`, `data` bytea                                                                                           |
+| `admins`            | staff: `username`, `password_hash`, `role`, `email` + `email_verified_at` (self sign-up), `group_name`, `logo_updated_at`   |
+| `account_codes`     | admin, `code_hash`, `attempts`, `expires_at`: host email verification                                                       |
+| `open_play_banners` | open play (pk, cascade), `mime`, `data` bytea; `open_plays.banner_updated_at` versions `/banners/[id]`                      |
+| `group_logos`       | admin (pk), `mime`, `data` bytea                                                                                            |
+| `open_play_invites` | open play + email (pk), `invited_by`: email invitations to host, claimed on verification                                    |
+| `open_plays`        | `venue`, `location`, `created_by` (account), date, start/end, `levels`, `max_pairs`, fee, `kind` (`regular` / `ranked`)     |
+| `open_play_hosts`   | open play + account (pk together): hosts invited to help run it                                                             |
+| `pairs`             | open play, entry `amount_cents`, `method`, host's `notes` (never emailed)                                                   |
+| `registrations`     | player, open play (unique together), `pair_id` (null = solo), `checked_in_at`                                               |
+| `email_codes`       | player, email, `code_hash`, `attempts`, `expires_at`                                                                        |
+| `sessions`          | open play, `status` active/ended, window, `state` jsonb                                                                     |
+| `matches`           | session, court, start/end, `score_a`, `score_b`                                                                             |
+| `match_players`     | match, player, `side` A/B, `name` and `level` at match time                                                                 |
+| `protests`          | player, current → requested level, reason, status, admin note, `filed_by` (signed-in player)                                |
+| `level_changes`     | player, from → to, note, optional `protest_id`                                                                              |
 
 `level` enum = `LEVELS` in `lib/ranking/levels.ts` (beginner, novice,
 intermediate, advanced, pro). Changing it needs a new migration.
