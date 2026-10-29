@@ -7,8 +7,11 @@ import { createSession, finishGame, startGame } from "@/lib/queue/engine";
 import type { QueueState } from "@/lib/queue/schema";
 import { PairRegistrationSchema } from "@/lib/registration/forms";
 import {
+  createAdmin,
   createOpenPlay,
   createProtest,
+  protestPlayerId,
+  removeProtest,
   playerByEmail,
   registerPair,
   sharedOpenPlay,
@@ -377,5 +380,32 @@ describe("protests", () => {
     const [after] = await listProtests(db, { status: "rejected" });
     expect(after.adminNote).toBe("Record doesn't show it yet");
     expect(after.resolvedAt).toBeInstanceOf(Date);
+  });
+
+  it("records who decided, scopes to a host's players, and can be removed", async () => {
+    const { ana } = await file();
+    const host = await createAdmin(db, "hana", "h", "host");
+    if ("error" in host) throw new Error(host.error);
+    const [protest] = await listProtests(db);
+    expect(await protestPlayerId(db, protest.id)).toBe(ana.id);
+    expect(await protestPlayerId(db, "junk")).toBeNull();
+
+    // A host sees protests about their players only.
+    expect(await listProtests(db, { playerIds: [ana.id] })).toHaveLength(1);
+    expect(await listProtests(db, { playerIds: [] })).toEqual([]);
+    expect(await pendingProtestCount(db, [ana.id])).toBe(1);
+    expect(await pendingProtestCount(db, [])).toBe(0);
+
+    await resolveProtest(db, protest.id, true, "", host.id);
+    const [decided] = await listProtests(db, { status: "approved" });
+    expect(decided.resolvedByName).toBe("hana");
+
+    // Removing keeps the level it set, and its history entry.
+    expect(await removeProtest(db, protest.id)).toBe(true);
+    expect(await listProtests(db)).toEqual([]);
+    expect((await getPlayer(db, ana.id))?.level).toBe("novice");
+    expect((await levelHistory(db, ana.id))[0].protestId).toBeNull();
+    expect(await removeProtest(db, protest.id)).toBe(false);
+    expect(await removeProtest(db, "junk")).toBe(false);
   });
 });

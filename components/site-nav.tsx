@@ -2,9 +2,15 @@ import Link from "next/link";
 import { logout, signOutPlayer } from "@/app/actions";
 import { Brand } from "@/components/brand";
 import { NavMenu } from "@/components/nav-menu";
+import { UserMenu } from "@/components/user-menu";
 import { currentAdmin, currentPlayer } from "@/lib/auth-server";
 import { getDb } from "@/lib/db/client";
-import { getPlayer, pendingProtestCount } from "@/lib/db/queries";
+import {
+  getPlayer,
+  managedPlayerIds,
+  pendingProtestCount,
+} from "@/lib/db/queries";
+import { ROLE_INFO } from "@/lib/roles";
 
 const LINK =
   "flex min-h-11 items-center gap-1.5 rounded-2xl px-3 font-display font-semibold text-ink/70 transition-colors hover:bg-fuchsia-50 hover:text-fuchsia-600";
@@ -40,16 +46,17 @@ export async function SiteNav() {
     return (
       <SiteNavShell>
         {me && name ? (
-          <>
-            <Link href={`/players/${me.playerId}`} className={LINK}>
-              <span aria-hidden>🙂</span> {name}
-            </Link>
-            <form action={signOutPlayer}>
-              <button type="submit" className={`${LINK} w-full`}>
-                Sign out
-              </button>
-            </form>
-          </>
+          <UserMenu
+            name={name}
+            links={[
+              {
+                href: `/players/${me.playerId}`,
+                emoji: "🙂",
+                label: "My profile",
+              },
+            ]}
+            signOut={signOutPlayer}
+          />
         ) : (
           <Link href="/login" className={LINK}>
             <span aria-hidden>👤</span> Sign in
@@ -64,34 +71,34 @@ export async function SiteNav() {
       </SiteNavShell>
     );
   }
-  // Hosts run their own open plays; levels and protests are for admins.
-  const pending = me.role === "admin" ? await pendingProtestCount(getDb()) : 0;
+  // Admins see every protest; hosts, those about their open plays' players.
+  const db = getDb();
+  const pending =
+    me.role === "admin"
+      ? await pendingProtestCount(db)
+      : await pendingProtestCount(db, await managedPlayerIds(db, me.id));
   return (
     <SiteNavShell>
       <Link href="/host" className={LINK}>
         <span aria-hidden>🏓</span> My open plays
       </Link>
-      {me.role === "admin" && (
-        <Link href="/admin/protests" className={LINK}>
-          <span aria-hidden>📣</span> Protests
-          {pending > 0 && (
-            <span className="min-w-6 rounded-full bg-fuchsia-500 px-1.5 text-center text-sm text-white tabular-nums">
-              {pending}
-            </span>
-          )}
-        </Link>
-      )}
+      <Link href="/admin/protests" className={LINK}>
+        <span aria-hidden>📣</span> Protests
+        {pending > 0 && (
+          <span className="min-w-6 rounded-full bg-fuchsia-500 px-1.5 text-center text-sm text-white tabular-nums">
+            {pending}
+          </span>
+        )}
+      </Link>
       <Link href="/admin/players" className={LINK}>
         <span aria-hidden>🗂️</span> Player desk
       </Link>
-      <Link href="/admin/settings" className={LINK}>
-        <span aria-hidden>⚙️</span> Settings
-      </Link>
-      <form action={logout}>
-        <button type="submit" className={`${LINK} w-full`}>
-          Sign out
-        </button>
-      </form>
+      <UserMenu
+        name={me.username}
+        badge={ROLE_INFO[me.role].label}
+        links={[{ href: "/admin/settings", emoji: "⚙️", label: "Settings" }]}
+        signOut={logout}
+      />
     </SiteNavShell>
   );
 }

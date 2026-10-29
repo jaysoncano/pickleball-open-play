@@ -73,6 +73,35 @@ protests their skill level.
   email filled in, and is listed under "Waiting to sign up" (cancellable)
   until they verify, then the open play is on their list. Invited hosts can be removed; the creator
   always stays. Removing an account keeps its open plays.
+- **Settings** (`/admin/settings`) is split into tabs, one section at a
+  time: **🏓 Group** (name and logo), **🔑 Account** (password), **👥
+  Accounts**, and for admins **➕ Add account**. Accounts is a table
+  (username, email, password, level): admins see every account (level,
+  remove), hosts see the accounts they made (co-host accounts). **➕ Add
+  account**: admins add an admin or host; hosts add a co-host account to
+  one of the open plays they made (picked from a list).
+- **Show/hide password** (👁 / 🙈, 📋 Copy): only on accounts you made, and
+  only the password you set. It's kept encrypted with `ADMIN_SECRET` and
+  fetched from the server when you tap Show. Once that person changes
+  their own password, the copy is deleted ("Changed by them"); their new
+  password is never visible. Self-signup and older accounts have none.
+- **Header:** who's signed in shows as **Name ▾** (first letter capitalized) (staff with their
+  level, e.g. Admin or Host). It opens a menu: **⚙️ Settings** and **🚪
+  Sign out** for staff, **🙂 My profile** and **🚪 Sign out** for players.
+- **Manage page tabs:** under the header (banner, counts, Check in &
+  start, Register pairs) come **📅 Details** (date, ranks, cap, fee;
+  Remove while nobody signed up), **📍 Venue**, **🖼️ Banner**, and **👥
+  Hosts (n)** (`?tab=`).
+- **New co-host account:** on Manage → Hosts, the main host (or an
+  admin) can also make an account outright: **username, email,
+  password** (🎲 makes a random one). It signs in right away (no email
+  code) and co-hosts only that open play. A card then shows the username,
+  email, and password once, with **📋 Copy all**, to hand over; passwords
+  are stored scrambled, so they can't be shown later (the co-host changes
+  it in Settings). The hosts list is a table: **Username, Email,
+  Password, Role**, Remove (emails are private: only that open play's
+  hosts see them). Password shows 👁 / 🙈 for accounts you made, until
+  they change it.
 - **Manage page** (`/open-plays/[id]/manage`, its hosts and admins
   only; anyone else is sent to the public page, signed-out visitors to
   sign-in): banner header with paid / waiting / solo / spots-left counts,
@@ -403,10 +432,16 @@ person to verify an email through a code claims that profile.
   who had a **confirmed (paid) spot in an open play with that player**.
   Anonymous visitors and outside players can't file. Pick the level it
   should be and say why. One pending protest per player.
-- The admin sees who filed it (name, email) and the open play they
-  shared. The public profile never shows who filed a protest.
-- `/admin/protests` lists pending protests with the player's record beside
-  each. Approve (moves the level) or reject, with a note the player sees.
+- Staff see who filed it and the open play they shared (only admins see
+  the filer's email). The public profile never shows who filed a protest.
+- `/admin/protests` (📣 Protests in the nav, with a pending count) lists
+  pending protests with the player's record beside each. Approve (moves
+  the level) or reject, with a note the player sees.
+  - **Hosts** see and decide protests about players of their open plays.
+  - **Admins** see every protest, so anything a host hasn't handled waits
+    for them. They can also **set the player's rank directly** and
+    **remove** a protest (a level it changed stays).
+  - Each decision records who made it ("Decided by makati.host").
 
 ## Confirmations
 

@@ -1,4 +1,7 @@
 import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
   createHmac,
   randomBytes,
   scryptSync,
@@ -43,6 +46,19 @@ export const NewPasswordSchema = z
     message: "The passwords don't match",
     path: ["confirm"],
   });
+
+/**
+ * A co-host account made by an open play's main host (or an admin) for
+ * their open play: username, email, and a password they hand over.
+ */
+export const NewCoHostSchema = z.object({
+  openPlayId: z.uuid("Pick an open play"),
+  username: UsernameSchema,
+  email: EmailSchema,
+  password: PasswordSchema,
+});
+
+export type NewCoHost = z.infer<typeof NewCoHostSchema>;
 
 /** A host signing themselves up; their email is verified with a code. */
 export const HostSignupSchema = z
@@ -147,4 +163,42 @@ export function isBootstrapLogin(
     same(username, (env.username || "admin").trim().toLowerCase()) &&
     same(password, env.password)
   );
+}
+
+/** The key for a creator's copy of a starting password, from the secret. */
+function startKey(secret: string): Buffer {
+  return createHash("sha256").update(`start-password:${secret}`).digest();
+}
+
+/**
+ * Encrypt the password a creator set for an account (AES-256-GCM), so only
+ * the server, with ADMIN_SECRET, can show it back to them.
+ */
+export function sealPassword(secret: string, password: string): string {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", startKey(secret), iv);
+  const data = Buffer.concat([cipher.update(password, "utf8"), cipher.final()]);
+  return ["v1", iv, cipher.getAuthTag(), data]
+    .map((p) => (typeof p === "string" ? p : p.toString("base64url")))
+    .join(".");
+}
+
+/** The sealed password, or null if it's tampered with or the secret changed. */
+export function openPassword(secret: string, sealed: string): string | null {
+  const [version, iv, tag, data] = sealed.split(".");
+  if (version !== "v1" || !iv || !tag || !data) return null;
+  try {
+    const decipher = createDecipheriv(
+      "aes-256-gcm",
+      startKey(secret),
+      Buffer.from(iv, "base64url"),
+    );
+    decipher.setAuthTag(Buffer.from(tag, "base64url"));
+    return Buffer.concat([
+      decipher.update(Buffer.from(data, "base64url")),
+      decipher.final(),
+    ]).toString("utf8");
+  } catch {
+    return null;
+  }
 }

@@ -1,0 +1,2 @@
+ALTER TABLE "protests" ADD COLUMN "resolved_by" uuid;--> statement-breakpoint
+ALTER TABLE "protests" ADD CONSTRAINT "protests_resolved_by_admins_id_fk" FOREIGN KEY ("resolved_by") REFERENCES "public"."admins"("id") ON DELETE set null ON UPDATE no action;

@@ -8,8 +8,11 @@ import {
   ADMIN_COOKIE_DAYS,
   adminToken,
   hashPassword,
+  openPassword,
+  sealPassword,
   HostSignupSchema,
   isBootstrapLogin,
+  NewCoHostSchema,
   NewPasswordSchema,
   passwordVersion,
   UsernameSchema,
@@ -478,6 +481,53 @@ export async function removeInvite(
 }
 
 /** Main host: take an invited host off. Its creator always stays. */
+export type CoHostState = FormState & {
+  /** The account just made, to hand over (with the password typed). */
+  made?: { username: string; email: string };
+};
+
+/**
+ * Its main host (or an admin): make a new host account that co-hosts this
+ * open play. It signs in right away with the password given here.
+ */
+export async function createCoHostAccount(
+  _prev: CoHostState,
+  form: FormData,
+): Promise<CoHostState> {
+  const openPlayId = String(form.get("openPlayId") ?? "");
+  const me = await requireMainHost(openPlayId);
+  const parsed = NewCoHostSchema.safeParse(Object.fromEntries(form));
+  if (!parsed.success) return { error: firstError(parsed) };
+  const made = await q.createCoHost(
+    getDb(),
+    parsed.data,
+    hashPassword(parsed.data.password),
+    {
+      createdBy: me.id,
+      startPassword: sealPassword(authSecret(), parsed.data.password),
+    },
+  );
+  if ("error" in made) return { error: made.error };
+  revalidatePath("/", "layout");
+  return {
+    error: null,
+    ok: true,
+    made: { username: parsed.data.username, email: parsed.data.email },
+  };
+}
+
+/**
+ * The password you set for an account you made, to hand over again.
+ * Null when it isn't yours to see, or they've changed it since.
+ */
+export async function revealStartPassword(
+  accountId: string,
+): Promise<string | null> {
+  const me = await requireStaff();
+  const sealed = await q.startPasswordFor(getDb(), accountId, me.id);
+  return sealed ? openPassword(authSecret(), sealed) : null;
+}
+
 export async function removeHost(
   openPlayId: string,
   adminId: string,
@@ -706,14 +756,31 @@ export async function fileProtest(
   return { error: null, ok: true };
 }
 
+/**
+ * Approve or reject a protest: admins any, hosts the ones about players of
+ * their open plays. Who decided is kept.
+ */
 export async function resolveProtest(form: FormData): Promise<void> {
-  await requireAdmin();
+  const me = await requireStaff();
   const { protestId, approve, note } = ResolutionSchema.parse({
     protestId: form.get("protestId"),
     approve: form.get("decision") === "approve",
     note: form.get("note") ?? "",
   });
-  await q.resolveProtest(getDb(), protestId, approve, note);
+  const db = getDb();
+  const playerId = await q.protestPlayerId(db, protestId);
+  if (!playerId || !(await staffFor(me, playerId))) {
+    throw new Error("Only this player's hosts or an admin can decide it.");
+  }
+  await q.resolveProtest(db, protestId, approve, note, me.id);
+  revalidatePath("/admin/protests");
+  revalidatePath("/players", "layout");
+}
+
+/** Admins: remove a protest (a level it changed stays as it is). */
+export async function removeProtestEntry(protestId: string): Promise<void> {
+  await requireAdmin();
+  await q.removeProtest(getDb(), protestId);
   revalidatePath("/admin/protests");
   revalidatePath("/players", "layout");
 }
@@ -1484,7 +1551,7 @@ export async function addAdmin(
   _prev: FormState,
   form: FormData,
 ): Promise<FormState> {
-  await requireAdmin();
+  const me = await requireAdmin();
   const username = UsernameSchema.safeParse(form.get("username"));
   if (!username.success) return { error: firstError(username) };
   const role = RoleSchema.safeParse(form.get("role"));
@@ -1496,6 +1563,10 @@ export async function addAdmin(
     username.data,
     hashPassword(pw.data.password),
     role.data,
+    {
+      createdBy: me.id,
+      startPassword: sealPassword(authSecret(), pw.data.password),
+    },
   );
   if ("error" in made) return { error: made.error };
   revalidatePath("/admin/settings");

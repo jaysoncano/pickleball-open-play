@@ -2,12 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
+import { StartPassword } from "@/components/admin/account-forms";
 import { Loading } from "@/components/loading";
 import { BannerForm } from "@/components/open-plays/banner-forms";
 import { EditOpenPlayForm } from "@/components/open-plays/edit-open-play";
 import {
   CancelInvite,
   InviteHostForm,
+  NewCoHostForm,
   RemoveHost,
 } from "@/components/open-plays/host-forms";
 import { PlayHeader, RankChip } from "@/components/open-plays/open-play-card";
@@ -40,7 +42,15 @@ type Props = PageProps<"/open-plays/[id]/manage">;
  * Its hosts: everything about one open play in one place. Every host
  * edits it and runs it; only its main host (or an admin) picks the hosts.
  */
-export default function ManagePage({ params }: Props) {
+const TABS = {
+  details: { emoji: "📅", label: "Details" },
+  venue: { emoji: "📍", label: "Venue" },
+  banner: { emoji: "🖼️", label: "Banner" },
+  hosts: { emoji: "👥", label: "Hosts" },
+} as const;
+type Tab = keyof typeof TABS;
+
+export default function ManagePage({ params, searchParams }: Props) {
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-5 px-4 py-5 sm:py-8">
       <Link
@@ -50,14 +60,17 @@ export default function ManagePage({ params }: Props) {
         ← My open plays
       </Link>
       <Suspense fallback={<Loading />}>
-        <Manage params={params} />
+        <Manage params={params} searchParams={searchParams} />
       </Suspense>
     </main>
   );
 }
 
-async function Manage({ params }: Pick<Props, "params">) {
+async function Manage({ params, searchParams }: Props) {
   const { id } = await params;
+  const asked = (await searchParams).tab;
+  const tab: Tab =
+    (Object.keys(TABS) as Tab[]).find((t) => t === asked) ?? "details";
   const me = await currentAdmin();
   if (!me) redirect("/host/login");
   const db = getDb();
@@ -141,129 +154,223 @@ async function Manage({ params }: Pick<Props, "params">) {
         </div>
       </header>
 
-      <section aria-labelledby="edit-title" className={CARD}>
-        <h2 id="edit-title" className="font-display text-xl font-bold">
-          <span aria-hidden>🗓️</span> Date, ranks &amp; entry
-        </h2>
-        <EditOpenPlayForm play={play} />
-      </section>
-
-      <section aria-labelledby="venue-title" className={CARD}>
-        <h2 id="venue-title" className="font-display text-xl font-bold">
-          <span aria-hidden>📍</span> Court venue
-        </h2>
-        {!play.venue && (
-          <p className="rounded-2xl bg-amber-100 px-4 py-3 text-sm font-semibold text-amber-900">
-            This open play has no venue yet, so players see &ldquo;Venue to be
-            announced&rdquo;. Add it below.
-          </p>
-        )}
-        <VenueForm
-          openPlayId={id}
-          current={{ venue: play.venue, location: play.location }}
-          venues={venues}
-        />
-      </section>
-
-      <section aria-labelledby="banner-title" className={CARD}>
-        <h2 id="banner-title" className="font-display text-xl font-bold">
-          <span aria-hidden>🖼️</span> Banner
-        </h2>
-        <BannerForm play={play} />
-      </section>
-
-      <section aria-labelledby="hosts-title" className={CARD}>
-        <div>
-          <h2 id="hosts-title" className="font-display text-xl font-bold">
-            <span aria-hidden>👥</span> Hosts
-          </h2>
-          <p className="text-sm text-ink/60">
-            Every host can edit this open play, register pairs, take payments,
-            and run the courts.{" "}
-            {mainHost
-              ? "As its main host, you choose who else hosts it."
-              : `Only its main host${owner ? ` (${owner.username})` : ""} or an admin can invite or remove hosts.`}
-          </p>
-        </div>
-        <ul className="flex flex-col gap-1.5">
-          {hosts.map((h) => (
-            <li
-              key={h.id}
-              className="flex flex-wrap items-center gap-3 rounded-2xl bg-white px-3 py-2"
-            >
-              <span className="flex-1 font-bold">
-                {h.username}
-                {h.id === me.id && (
-                  <span className="ml-2 rounded-full bg-fuchsia-100 px-2 py-px text-xs text-fuchsia-800">
-                    you
-                  </span>
-                )}
+      <nav
+        aria-label="Manage"
+        className="grid grid-cols-2 gap-1.5 rounded-2xl bg-white/80 p-1.5 ring-2 ring-white sm:grid-cols-4"
+      >
+        {(Object.keys(TABS) as Tab[]).map((t) => (
+          <Link
+            key={t}
+            href={
+              t === "details"
+                ? `/open-plays/${id}/manage`
+                : `/open-plays/${id}/manage?tab=${t}`
+            }
+            aria-current={tab === t ? "page" : undefined}
+            className={`flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-3 font-display font-semibold whitespace-nowrap transition-colors ${tab === t ? "bg-fuchsia-500 text-white shadow-[0_3px_0_0_#a21caf]" : "text-ink/60 hover:bg-fuchsia-50 hover:text-fuchsia-600"}`}
+          >
+            <span aria-hidden>{TABS[t].emoji}</span>
+            {TABS[t].label}
+            {t === "hosts" && (
+              <span
+                className={`min-w-6 rounded-full px-1.5 text-center text-sm tabular-nums ${tab === t ? "bg-white/25" : "bg-ink/5"}`}
+              >
+                {hosts.length}
               </span>
-              <span className="text-sm font-semibold text-ink/45">
-                {h.owner
-                  ? "👑 Main host"
-                  : `Co-host · ${ROLE_INFO[h.role].label}`}
-              </span>
-              {mainHost && !h.owner && (
-                <RemoveHost
-                  openPlayId={id}
-                  adminId={h.id}
-                  username={h.username}
-                />
-              )}
-            </li>
-          ))}
-          {hosts.length === 0 && <li className="text-ink/50">No hosts yet.</li>}
-        </ul>
-
-        {mainHost && (
-          <div className="mt-2 flex flex-col gap-2 border-t-2 border-ink/5 pt-4">
-            <h3 className="font-display text-lg font-semibold">
-              ✉️ Invite a co-host
-            </h3>
-            <p className="text-sm text-ink/60">
-              Type a host&apos;s username, or anyone&apos;s email. No account
-              yet? We email them an invitation to sign up as a host; once they
-              verify their email, they co-host this open play.
-            </p>
-            <InviteHostForm
-              openPlayId={id}
-              usernames={accounts
-                .filter((a) => a.verified && !taken.has(a.id))
-                .map((a) => a.username)}
-            />
-            {invites.length > 0 && (
-              <>
-                <h4 className="mt-2 font-display font-semibold">
-                  Waiting to sign up ({invites.length})
-                </h4>
-                <ul className="flex flex-col gap-1.5">
-                  {invites.map((email) => (
-                    <li
-                      key={email}
-                      className="flex flex-wrap items-center gap-3 rounded-2xl bg-amber-50 px-3 py-2"
-                    >
-                      <span className="min-w-0 flex-1 truncate font-semibold">
-                        ✉️ {email}
-                      </span>
-                      <CancelInvite openPlayId={id} email={email} />
-                    </li>
-                  ))}
-                </ul>
-              </>
             )}
-          </div>
-        )}
-      </section>
+          </Link>
+        ))}
+      </nav>
 
-      {play.pairCount === 0 && !play.live && signups.pending.length === 0 && (
-        <section className="flex flex-wrap items-center justify-between gap-3 rounded-[2rem] p-4 ring-2 ring-ink/10">
-          <p className="text-sm font-semibold text-ink/60">
-            Nobody has signed up yet, so it can still be removed.
-          </p>
-          <RemoveOpenPlay id={id} then="/host" />
+      {tab === "details" && (
+        <section aria-labelledby="edit-title" className={CARD}>
+          <h2 id="edit-title" className="font-display text-xl font-bold">
+            <span aria-hidden>🗓️</span> Date, ranks &amp; entry
+          </h2>
+          <EditOpenPlayForm play={play} />
         </section>
       )}
+
+      {tab === "venue" && (
+        <section aria-labelledby="venue-title" className={CARD}>
+          <h2 id="venue-title" className="font-display text-xl font-bold">
+            <span aria-hidden>📍</span> Court venue
+          </h2>
+          {!play.venue && (
+            <p className="rounded-2xl bg-amber-100 px-4 py-3 text-sm font-semibold text-amber-900">
+              This open play has no venue yet, so players see &ldquo;Venue to be
+              announced&rdquo;. Add it below.
+            </p>
+          )}
+          <VenueForm
+            openPlayId={id}
+            current={{ venue: play.venue, location: play.location }}
+            venues={venues}
+          />
+        </section>
+      )}
+
+      {tab === "banner" && (
+        <section aria-labelledby="banner-title" className={CARD}>
+          <h2 id="banner-title" className="font-display text-xl font-bold">
+            <span aria-hidden>🖼️</span> Banner
+          </h2>
+          <BannerForm play={play} />
+        </section>
+      )}
+
+      {tab === "hosts" && (
+        <section aria-labelledby="hosts-title" className={CARD}>
+          <div>
+            <h2 id="hosts-title" className="font-display text-xl font-bold">
+              <span aria-hidden>👥</span> Hosts
+            </h2>
+            <p className="text-sm text-ink/60">
+              Every host can edit this open play, register pairs, take payments,
+              and run the courts.{" "}
+              {mainHost
+                ? "As its main host, you choose who else hosts it."
+                : `Only its main host${owner ? ` (${owner.username})` : ""} or an admin can invite or remove hosts.`}
+            </p>
+          </div>
+          <div className="overflow-x-auto rounded-2xl bg-white ring-2 ring-ink/5">
+            <table className="w-full min-w-[40rem] text-left text-sm">
+              <thead className="text-[11px] font-bold tracking-wide text-ink/50 uppercase">
+                <tr className="border-b-2 border-ink/5">
+                  <th scope="col" className="px-3 py-2">
+                    Username
+                  </th>
+                  <th scope="col" className="px-3 py-2">
+                    Email
+                  </th>
+                  <th scope="col" className="px-3 py-2">
+                    Password
+                  </th>
+                  <th scope="col" className="px-3 py-2">
+                    Role
+                  </th>
+                  <th scope="col" className="px-3 py-2">
+                    <span className="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {hosts.map((h) => (
+                  <tr key={h.id} className="border-b border-ink/5">
+                    <td className="px-3 py-2 font-bold">
+                      {h.username}
+                      {h.id === me.id && (
+                        <span className="ml-2 rounded-full bg-fuchsia-100 px-2 py-px text-xs text-fuchsia-800">
+                          you
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 break-all text-ink/70">
+                      {h.email ?? <span className="text-ink/30">—</span>}
+                    </td>
+                    <td className="px-3 py-2">
+                      {h.createdBy === me.id ? (
+                        <StartPassword
+                          id={h.id}
+                          username={h.username}
+                          canShow={h.hasStartPassword}
+                        />
+                      ) : (
+                        <span className="text-xs text-ink/30">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 font-semibold whitespace-nowrap text-ink/55">
+                      {h.owner
+                        ? "👑 Main host"
+                        : `Co-host · ${ROLE_INFO[h.role].label}`}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {mainHost && !h.owner && (
+                        <RemoveHost
+                          openPlayId={id}
+                          adminId={h.id}
+                          username={h.username}
+                        />
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {hosts.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-3 py-3 text-ink/50">
+                      No hosts yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {mainHost && (
+            <>
+              <div className="mt-2 flex flex-col gap-2 border-t-2 border-ink/5 pt-4">
+                <h3 className="font-display text-lg font-semibold">
+                  ➕ New co-host account
+                </h3>
+                <p className="text-sm text-ink/60">
+                  Make an account for someone helping you run this open play:
+                  username, email, and a password you give them. They can sign
+                  in right away and co-host only what you add them to.
+                </p>
+                <NewCoHostForm openPlayId={id} />
+              </div>
+              <div className="mt-2 flex flex-col gap-2 border-t-2 border-ink/5 pt-4">
+                <h3 className="font-display text-lg font-semibold">
+                  ✉️ Invite a co-host
+                </h3>
+                <p className="text-sm text-ink/60">
+                  Type a host&apos;s username, or anyone&apos;s email. No
+                  account yet? We email them an invitation to sign up as a host;
+                  once they verify their email, they co-host this open play.
+                </p>
+                <InviteHostForm
+                  openPlayId={id}
+                  usernames={accounts
+                    .filter((a) => a.verified && !taken.has(a.id))
+                    .map((a) => a.username)}
+                />
+                {invites.length > 0 && (
+                  <>
+                    <h4 className="mt-2 font-display font-semibold">
+                      Waiting to sign up ({invites.length})
+                    </h4>
+                    <ul className="flex flex-col gap-1.5">
+                      {invites.map((email) => (
+                        <li
+                          key={email}
+                          className="flex flex-wrap items-center gap-3 rounded-2xl bg-amber-50 px-3 py-2"
+                        >
+                          <span className="min-w-0 flex-1 truncate font-semibold">
+                            ✉️ {email}
+                          </span>
+                          <CancelInvite openPlayId={id} email={email} />
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </div>
+            </>
+          )}
+        </section>
+      )}
+
+      {tab === "details" &&
+        play.pairCount === 0 &&
+        !play.live &&
+        signups.pending.length === 0 && (
+          <section className="flex flex-wrap items-center justify-between gap-3 rounded-[2rem] p-4 ring-2 ring-ink/10">
+            <p className="text-sm font-semibold text-ink/60">
+              Nobody has signed up yet, so it can still be removed.
+            </p>
+            <RemoveOpenPlay id={id} then="/host" />
+          </section>
+        )}
     </>
   );
 }

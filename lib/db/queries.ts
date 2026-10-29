@@ -876,7 +876,15 @@ export async function openPlayManagers(
   return { createdBy: play.createdBy, hostIds: hosts.map((h) => h.id) };
 }
 
-export type OpenPlayHost = Account & { owner: boolean };
+export type OpenPlayHost = Account & {
+  owner: boolean;
+  /** Private: shown only to staff who manage the open play. */
+  email: string | null;
+  /** The account that made this one, if any. */
+  createdBy: string | null;
+  /** Its creator can still show the password they set. */
+  hasStartPassword: boolean;
+};
 
 /** The creator first, then invited hosts by username. */
 export async function listOpenPlayHosts(
@@ -888,6 +896,9 @@ export async function listOpenPlayHosts(
     id: admins.id,
     username: admins.username,
     role: admins.role,
+    email: admins.email,
+    createdBy: admins.createdBy,
+    hasStartPassword: sql<boolean>`${admins.startPassword} is not null`,
   };
   const [owner] = await db
     .select(account)
@@ -946,6 +957,47 @@ export async function inviteHost(
     .values({ openPlayId, adminId: account.id })
     .onConflictDoNothing();
   return { added: account.username };
+}
+
+/**
+ * The main host (or an admin) makes a new host account for their open
+ * play: it signs in right away (the email counts as checked, since they
+ * vouch for it) and co-hosts it. Returns the account, or an error.
+ */
+export async function createCoHost(
+  db: Db,
+  input: { openPlayId: string; username: string; email: string },
+  passwordHash: string,
+  madeBy: MadeBy = {},
+): Promise<{ id: string } | { error: string }> {
+  if (!(await openPlayManagers(db, input.openPlayId))) {
+    return { error: "Open play not found" };
+  }
+  if (await adminByUsername(db, input.username)) {
+    return { error: `The username ${input.username} is taken` };
+  }
+  if (await adminByEmail(db, input.email)) {
+    return {
+      error: `${input.email} already has an account. Invite it instead.`,
+    };
+  }
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .insert(admins)
+      .values({
+        username: input.username,
+        email: input.email,
+        emailVerifiedAt: new Date(),
+        passwordHash,
+        role: "host",
+        ...madeBy,
+      })
+      .returning({ id: admins.id });
+    await tx
+      .insert(openPlayHosts)
+      .values({ openPlayId: input.openPlayId, adminId: row.id });
+    return { id: row.id };
+  });
 }
 
 /** Emails invited to host an open play who haven't signed up yet. */
@@ -2594,41 +2646,80 @@ export async function countAdmins(db: Db): Promise<number> {
 }
 
 /** Every account: admins first, then hosts, each by username. */
+const accountListFields = {
+  id: admins.id,
+  username: admins.username,
+  role: admins.role,
+  email: admins.email,
+  verified: adminRow.verified,
+  groupName: admins.groupName,
+  createdBy: admins.createdBy,
+  /** Its creator can still show the password they set. */
+  hasStartPassword: sql<boolean>`${admins.startPassword} is not null`,
+  createdAt: admins.createdAt,
+};
+
 export async function listAdmins(db: Db) {
   return db
-    .select({
-      id: admins.id,
-      username: admins.username,
-      role: admins.role,
-      email: admins.email,
-      verified: adminRow.verified,
-      groupName: admins.groupName,
-      createdAt: admins.createdAt,
-    })
+    .select(accountListFields)
     .from(admins)
     .orderBy(asc(admins.role), asc(admins.username));
 }
+
+/** Who made an account, and the password they set (sealed), if any. */
+export type MadeBy = { createdBy?: string | null; startPassword?: string };
 
 export async function createAdmin(
   db: Db,
   username: string,
   passwordHash: string,
   role: Role = "admin",
+  madeBy: MadeBy = {},
 ): Promise<{ id: string } | { error: string }> {
   const [row] = await db
     .insert(admins)
-    .values({ username, passwordHash, role })
+    .values({ username, passwordHash, role, ...madeBy })
     .onConflictDoNothing()
     .returning({ id: admins.id });
   return row ?? { error: `The username ${username} is taken` };
 }
 
+/** Their own new password: the creator's copy of the old one is dropped. */
 export async function setAdminPassword(
   db: Db,
   id: string,
   passwordHash: string,
 ): Promise<void> {
-  await db.update(admins).set({ passwordHash }).where(eq(admins.id, id));
+  await db
+    .update(admins)
+    .set({ passwordHash, startPassword: null })
+    .where(eq(admins.id, id));
+}
+
+/** The accounts this one made, for its Accounts tab. */
+export async function listCreatedAccounts(db: Db, creatorId: string) {
+  return db
+    .select(accountListFields)
+    .from(admins)
+    .where(eq(admins.createdBy, creatorId))
+    .orderBy(asc(admins.username));
+}
+
+/**
+ * The sealed password an account's creator set, for that creator only;
+ * null otherwise, or once the account changed it.
+ */
+export async function startPasswordFor(
+  db: Db,
+  accountId: string,
+  creatorId: string,
+): Promise<string | null> {
+  if (!z.uuid().safeParse(accountId).success) return null;
+  const [row] = await db
+    .select({ sealed: admins.startPassword })
+    .from(admins)
+    .where(and(eq(admins.id, accountId), eq(admins.createdBy, creatorId)));
+  return row?.sealed ?? null;
 }
 
 /** Name the group that hosts this account's open plays. */
@@ -2910,10 +3001,19 @@ export async function createProtest(
   return null;
 }
 
+/** The account that decided a protest. */
+const decider = alias(admins, "decider");
+
 export async function listProtests(
   db: Db,
-  filter: { status?: ProtestStatus; playerId?: string } = {},
+  filter: {
+    status?: ProtestStatus;
+    playerId?: string;
+    /** A host's players (of their open plays); all when absent. */
+    playerIds?: string[];
+  } = {},
 ) {
+  if (filter.playerIds && filter.playerIds.length === 0) return [];
   return db
     .select({
       id: protests.id,
@@ -2930,14 +3030,19 @@ export async function listProtests(
       filedById: protests.filedBy,
       filedByName: filer.name,
       filedByEmail: filer.email,
+      resolvedByName: decider.username,
     })
     .from(protests)
     .innerJoin(players, eq(players.id, protests.playerId))
     .leftJoin(filer, eq(filer.id, protests.filedBy))
+    .leftJoin(decider, eq(decider.id, protests.resolvedBy))
     .where(
       and(
         filter.status ? eq(protests.status, filter.status) : undefined,
         filter.playerId ? eq(protests.playerId, filter.playerId) : undefined,
+        filter.playerIds
+          ? inArray(protests.playerId, filter.playerIds)
+          : undefined,
       ),
     )
     .orderBy(desc(protests.createdAt));
@@ -2952,12 +3057,15 @@ export async function resolveProtest(
   protestId: string,
   approve: boolean,
   note: string,
+  /** The host or admin deciding. */
+  resolvedBy: string | null = null,
 ): Promise<boolean> {
   const [protest] = await db
     .update(protests)
     .set({
       status: approve ? "approved" : "rejected",
       adminNote: note,
+      resolvedBy,
       resolvedAt: new Date(),
     })
     .where(and(eq(protests.id, protestId), eq(protests.status, "pending")))
@@ -2975,10 +3083,50 @@ export async function resolveProtest(
   return true;
 }
 
-export async function pendingProtestCount(db: Db): Promise<number> {
+/** Pending protests: all of them, or about these players (a host's). */
+export async function pendingProtestCount(
+  db: Db,
+  playerIds?: string[],
+): Promise<number> {
+  if (playerIds && playerIds.length === 0) return 0;
   const [row] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(protests)
-    .where(eq(protests.status, "pending"));
+    .where(
+      and(
+        eq(protests.status, "pending"),
+        playerIds ? inArray(protests.playerId, playerIds) : undefined,
+      ),
+    );
   return row.n;
+}
+
+/** The player a protest is about, or null. */
+export async function protestPlayerId(
+  db: Db,
+  protestId: string,
+): Promise<string | null> {
+  if (!z.uuid().safeParse(protestId).success) return null;
+  const [row] = await db
+    .select({ playerId: protests.playerId })
+    .from(protests)
+    .where(eq(protests.id, protestId));
+  return row?.playerId ?? null;
+}
+
+/** Admins: remove a protest (a level it changed stays changed). */
+export async function removeProtest(
+  db: Db,
+  protestId: string,
+): Promise<boolean> {
+  if (!z.uuid().safeParse(protestId).success) return false;
+  await db
+    .update(levelChanges)
+    .set({ protestId: null })
+    .where(eq(levelChanges.protestId, protestId));
+  const rows = await db
+    .delete(protests)
+    .where(eq(protests.id, protestId))
+    .returning({ id: protests.id });
+  return rows.length > 0;
 }

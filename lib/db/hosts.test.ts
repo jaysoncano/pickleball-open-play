@@ -5,10 +5,15 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { SoloRegistrationSchema } from "@/lib/registration/forms";
 import type { OpenPlayInput } from "@/lib/registration/open-play";
 import {
+  adminByUsername,
   createAdmin,
+  createCoHost,
   createOpenPlay,
   ensurePlayers,
   inviteHost,
+  listCreatedAccounts,
+  setAdminPassword,
+  startPasswordFor,
   listOpenPlayHosts,
   listOpenPlays,
   openPlayManagers,
@@ -95,9 +100,33 @@ describe("open play hosts", () => {
     expect(await inviteHost(db, id, "boss")).toEqual({ added: "boss" });
 
     expect(await listOpenPlayHosts(db, id)).toEqual([
-      { id: hana, username: "hana", role: "host", owner: true },
-      { id: boss, username: "boss", role: "admin", owner: false },
-      { id: ivan, username: "ivan", role: "host", owner: false },
+      {
+        id: hana,
+        username: "hana",
+        role: "host",
+        owner: true,
+        email: null,
+        createdBy: null,
+        hasStartPassword: false,
+      },
+      {
+        id: boss,
+        username: "boss",
+        role: "admin",
+        owner: false,
+        email: null,
+        createdBy: null,
+        hasStartPassword: false,
+      },
+      {
+        id: ivan,
+        username: "ivan",
+        role: "host",
+        owner: false,
+        email: null,
+        createdBy: null,
+        hasStartPassword: false,
+      },
     ]);
     expect(await openPlayManagers(db, id)).toEqual({
       createdBy: hana,
@@ -123,7 +152,15 @@ describe("open play hosts", () => {
       hostIds: [ivan],
     });
     expect(await listOpenPlayHosts(db, id)).toEqual([
-      { id: ivan, username: "ivan", role: "host", owner: false },
+      {
+        id: ivan,
+        username: "ivan",
+        role: "host",
+        owner: false,
+        email: null,
+        createdBy: null,
+        hasStartPassword: false,
+      },
     ]);
   });
 
@@ -180,5 +217,93 @@ describe("venue suggestions", () => {
       "Sunrise Courts",
       "Old Gym",
     ]);
+  });
+
+  describe("createCoHost", () => {
+    it("makes a host account that co-hosts the open play and can sign in", async () => {
+      const id = await createOpenPlay(db, play(), hana);
+      const made = await createCoHost(
+        db,
+        { openPlayId: id, username: "jo", email: "jo@x.co" },
+        "hash",
+      );
+      if ("error" in made) throw new Error(made.error);
+      expect(await adminByUsername(db, "jo")).toMatchObject({
+        id: made.id,
+        role: "host",
+        email: "jo@x.co",
+        verified: true,
+      });
+      expect(await listOpenPlayHosts(db, id)).toEqual([
+        expect.objectContaining({ username: "hana", owner: true }),
+        {
+          id: made.id,
+          username: "jo",
+          role: "host",
+          owner: false,
+          email: "jo@x.co",
+          createdBy: null,
+          hasStartPassword: false,
+        },
+      ]);
+    });
+
+    it("refuses a taken username or email, and a missing open play", async () => {
+      const id = await createOpenPlay(db, play(), hana);
+      const jo = { openPlayId: id, username: "jo", email: "jo@x.co" };
+      await createCoHost(db, jo, "hash");
+      expect(await createCoHost(db, { ...jo, email: "new@x.co" }, "h")).toEqual(
+        {
+          error: "The username jo is taken",
+        },
+      );
+      expect(await createCoHost(db, { ...jo, username: "jo2" }, "h")).toEqual({
+        error: "jo@x.co already has an account. Invite it instead.",
+      });
+      expect(
+        await createCoHost(
+          db,
+          { ...jo, openPlayId: MISSING, username: "x1" },
+          "h",
+        ),
+      ).toEqual({ error: "Open play not found" });
+    });
+  });
+
+  describe("accounts an account made", () => {
+    it("lists them for their creator, who alone gets the starting password", async () => {
+      const id = await createOpenPlay(db, play(), hana);
+      const made = await createCoHost(
+        db,
+        { openPlayId: id, username: "jo", email: "jo@x.co" },
+        "hash",
+        { createdBy: hana, startPassword: "sealed" },
+      );
+      if ("error" in made) throw new Error(made.error);
+      const added = await createAdmin(db, "kai", "h", "host", {
+        createdBy: hana,
+      });
+      if ("error" in added) throw new Error(added.error);
+
+      expect(
+        (await listCreatedAccounts(db, hana)).map((a) => a.username),
+      ).toEqual(["jo", "kai"]);
+      expect(await listCreatedAccounts(db, ivan)).toEqual([]);
+      expect((await listCreatedAccounts(db, hana))[0]).toMatchObject({
+        createdBy: hana,
+        hasStartPassword: true,
+      });
+
+      expect(await startPasswordFor(db, made.id, hana)).toBe("sealed");
+      expect(await startPasswordFor(db, made.id, ivan)).toBeNull();
+      expect(await startPasswordFor(db, "junk", hana)).toBeNull();
+
+      // Once they set their own password, the creator's copy is gone.
+      await setAdminPassword(db, made.id, "new-hash");
+      expect(await startPasswordFor(db, made.id, hana)).toBeNull();
+      expect((await listCreatedAccounts(db, hana))[0].hasStartPassword).toBe(
+        false,
+      );
+    });
   });
 });

@@ -12,6 +12,7 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { ROLES } from "@/lib/roles";
 import { HANDS } from "@/lib/profile/forms";
@@ -111,6 +112,15 @@ export const admins = pgTable("admins", {
   /** The group that hosts this account's open plays; shown on them. */
   groupName: text("group_name").notNull().default(""),
   logoUpdatedAt: timestamp("logo_updated_at", { withTimezone: true }),
+  /** The account that made this one (Settings, or a co-host account). */
+  createdBy: uuid("created_by").references((): AnyPgColumn => admins.id, {
+    onDelete: "set null",
+  }),
+  /**
+   * The password its creator set, encrypted with ADMIN_SECRET, so only
+   * they can show it to hand over. Cleared once the account changes it.
+   */
+  startPassword: text("start_password"),
   createdAt: createdAt(),
 }).enableRLS();
 
@@ -350,6 +360,10 @@ export const protests = pgTable("protests", {
   filedBy: uuid("filed_by").references(() => players.id),
   status: protestStatusEnum("status").notNull().default("pending"),
   adminNote: text("admin_note").notNull().default(""),
+  /** The host or admin who decided it; null while pending. */
+  resolvedBy: uuid("resolved_by").references(() => admins.id, {
+    onDelete: "set null",
+  }),
   createdAt: createdAt(),
   resolvedAt: timestamp("resolved_at", { withTimezone: true }),
 }).enableRLS();

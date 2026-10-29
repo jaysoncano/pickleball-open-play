@@ -5,6 +5,7 @@ import {
   addAdmin,
   changeAdminPassword,
   removeAdminAccount,
+  revealStartPassword,
   saveGroup,
   setAccountRole,
   type FormState,
@@ -340,5 +341,70 @@ export function GroupForm({
         {pending ? "Saving…" : "Save group"}
       </ConfirmSubmit>
     </form>
+  );
+}
+
+/**
+ * The password you set for an account you made: hidden until you ask. It
+ * comes from the server only then, and only for you, until they change it.
+ */
+export function StartPassword({
+  id,
+  username,
+  canShow,
+}: {
+  id: string;
+  username: string;
+  /** You made it and they haven't changed it. */
+  canShow: boolean;
+}) {
+  const [shown, setShown] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [busy, start] = useTransition();
+  if (!canShow || failed) {
+    return (
+      <span className="text-xs font-semibold text-ink/40">Changed by them</span>
+    );
+  }
+  return (
+    <span className="flex items-center gap-1.5 whitespace-nowrap">
+      <span className="font-mono text-sm font-bold tracking-wide">
+        {shown ?? "••••••••"}
+      </span>
+      <button
+        type="button"
+        disabled={busy}
+        aria-label={`${shown ? "Hide" : "Show"} ${username}'s password`}
+        onClick={() => {
+          if (shown) {
+            setShown(null);
+            return;
+          }
+          start(async () => {
+            const pw = await revealStartPassword(id);
+            if (pw === null) setFailed(true);
+            else setShown(pw);
+          });
+        }}
+        className="rounded-full px-2 py-0.5 text-xs font-bold text-violet-700 ring-2 ring-violet-200 hover:bg-violet-50"
+      >
+        {busy ? "…" : shown ? "🙈 Hide" : "👁 Show"}
+      </button>
+      {shown && (
+        <button
+          type="button"
+          onClick={() =>
+            navigator.clipboard
+              ?.writeText(shown)
+              .then(() => setCopied(true))
+              .catch(() => setCopied(false))
+          }
+          className="rounded-full px-2 py-0.5 text-xs font-bold text-lime-800 ring-2 ring-lime-200 hover:bg-lime-50"
+        >
+          {copied ? "✓ Copied" : "📋 Copy"}
+        </button>
+      )}
+    </span>
   );
 }
