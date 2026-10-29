@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { resolveProtest } from "@/app/actions";
 import { LevelBadge } from "@/components/level-badge";
@@ -50,7 +50,7 @@ export default function ProtestsPage() {
 }
 
 async function Protests() {
-  if (!(await isAdmin())) redirect("/admin/login");
+  if (!(await isAdmin())) notFound(); // Admin pages stay hidden.
   const db = getDb();
   const all = await listProtests(db);
   const pending = all.filter((p) => p.status === "pending");

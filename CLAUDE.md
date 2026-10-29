@@ -39,7 +39,9 @@ Tailwind 4, Zod 4, Drizzle ORM on Supabase Postgres (local via
   `/host/signup` + `/host/verify` (host self sign-up, email code),
   `/groups/[id]` (public group page) + `/groups/[id]/logo`, `/players`, `/players/[id]`,
   `/players/[id]/edit`, `/players/[id]/verify` (returning player → email code), `/claim/[token]` (QR → email code),
-  `/confirm/[token]` (receipt link), `/admin/login`, `/admin/protests`,
+  `/confirm/[token]` (receipt link), `/host/login` (hosts only),
+  `/admin/login` (admins only, "Admin" nav link; admin-only pages 404 instead of
+  redirecting there), `/admin/protests`,
   `/admin/qr-codes`, `/admin/players` (Player desk: pair sign-up, payment),
   `/admin/settings` (accounts and levels, password), `/login` (players).
   Host dashboard

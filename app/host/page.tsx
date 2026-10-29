@@ -39,7 +39,7 @@ async function MyOpenPlays({
 }: Pick<PageProps<"/host">, "searchParams">) {
   await connection();
   const me = await currentAdmin();
-  if (!me) redirect("/admin/login");
+  if (!me) redirect("/host/login");
   const all = me.role === "admin" && (await searchParams).view === "all";
   const managedBy = all ? undefined : me.id;
   const db = getDb();

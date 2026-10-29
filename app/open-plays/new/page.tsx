@@ -40,7 +40,7 @@ export default function NewOpenPlayPage() {
 
 async function NewOpenPlay() {
   const me = await currentAdmin();
-  if (!me) redirect("/admin/login");
+  if (!me) redirect("/host/login");
   const db = getDb();
   const [venues, account] = await Promise.all([
     venueSuggestions(db, {

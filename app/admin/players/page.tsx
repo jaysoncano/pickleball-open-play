@@ -41,7 +41,7 @@ async function Desk({
   searchParams,
 }: Pick<PageProps<"/admin/players">, "searchParams">) {
   const me = await currentAdmin();
-  if (!me) redirect("/admin/login");
+  if (!me) redirect("/host/login");
   const { date, openPlay } = await searchParams;
   const one = (v: string | string[] | undefined) =>
     typeof v === "string" ? v : undefined;

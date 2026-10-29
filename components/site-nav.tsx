@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { logout, signOutPlayer } from "@/app/actions";
 import { Brand } from "@/components/brand";
+import { NavMenu } from "@/components/nav-menu";
 import { currentAdmin, currentPlayer } from "@/lib/auth-server";
 import { getDb } from "@/lib/db/client";
 import { getPlayer, pendingProtestCount } from "@/lib/db/queries";
@@ -18,7 +19,7 @@ export function SiteNavShell({ children }: { children?: React.ReactNode }) {
       <Link href="/" aria-label="POP home" className="rounded-2xl">
         <Brand />
       </Link>
-      <div className="flex flex-wrap items-center gap-1">
+      <NavMenu>
         <Link href="/" className={LINK}>
           <span aria-hidden>🎾</span> Open plays
         </Link>
@@ -26,7 +27,7 @@ export function SiteNavShell({ children }: { children?: React.ReactNode }) {
           <span aria-hidden>🙌</span> Players
         </Link>
         {children}
-      </div>
+      </NavMenu>
     </nav>
   );
 }
@@ -44,7 +45,7 @@ export async function SiteNav() {
               <span aria-hidden>🙂</span> {name}
             </Link>
             <form action={signOutPlayer}>
-              <button type="submit" className={LINK}>
+              <button type="submit" className={`${LINK} w-full`}>
                 Sign out
               </button>
             </form>
@@ -54,8 +55,11 @@ export async function SiteNav() {
             <span aria-hidden>👤</span> Sign in
           </Link>
         )}
+        <Link href="/host/login" className={LINK}>
+          <span aria-hidden>🏓</span> Host
+        </Link>
         <Link href="/admin/login" className={LINK}>
-          <span aria-hidden>🔑</span> Staff
+          <span aria-hidden>🔑</span> Admin
         </Link>
       </SiteNavShell>
     );
@@ -84,7 +88,7 @@ export async function SiteNav() {
         <span aria-hidden>⚙️</span> Settings
       </Link>
       <form action={logout}>
-        <button type="submit" className={LINK}>
+        <button type="submit" className={`${LINK} w-full`}>
           Sign out
         </button>
       </form>

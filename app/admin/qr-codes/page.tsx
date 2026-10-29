@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { Loading } from "@/components/loading";
 import { PrintButton } from "@/components/profile/qr-actions";
@@ -41,7 +41,7 @@ const FILTER =
 async function Sheet({
   searchParams,
 }: Pick<PageProps<"/admin/qr-codes">, "searchParams">) {
-  if (!(await isAdmin())) redirect("/admin/login");
+  if (!(await isAdmin())) notFound(); // Admin pages stay hidden.
   const all = (await searchParams).show === "all";
   const everyone = (await listClaimTokens(getDb())).map((p) => ({
     ...p,

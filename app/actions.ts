@@ -99,6 +99,7 @@ import {
   RoleSchema,
   VenueSchema,
   venueLabel,
+  type Role,
 } from "@/lib/roles";
 import { claimUrl, originFrom, qrSvg } from "@/lib/qr";
 import { z } from "zod";
@@ -160,14 +161,27 @@ function decoy(): string {
 
 const WRONG = "Wrong username or password";
 
-/**
- * Admin sign-in with username and password. Before any admin account
- * exists, ADMIN_USERNAME (default "admin") and ADMIN_PASSWORD create it.
- */
-export async function login(
+/** Host sign-in (public `/host/login`). Admin accounts can't use it. */
+export async function loginHost(
   _prev: FormState,
   form: FormData,
 ): Promise<FormState> {
+  return staffLogin(form, "host");
+}
+
+/**
+ * Admin sign-in (`/admin/login`). Before any admin account
+ * exists, ADMIN_USERNAME (default "admin") and ADMIN_PASSWORD create it.
+ */
+export async function loginAdmin(
+  _prev: FormState,
+  form: FormData,
+): Promise<FormState> {
+  return staffLogin(form, "admin");
+}
+
+/** Username and password sign-in; the wrong account level reads as WRONG. */
+async function staffLogin(form: FormData, role: Role): Promise<FormState> {
   const secret = process.env.ADMIN_SECRET;
   if (!secret) return { error: "Set ADMIN_SECRET in .env.local" };
   const username = UsernameSchema.safeParse(form.get("username"));
@@ -176,6 +190,7 @@ export async function login(
   const db = getDb();
   let admin = await q.adminByUsername(db, username.data);
   if (
+    role === "admin" &&
     !admin &&
     (await q.countAdmins(db)) === 0 &&
     isBootstrapLogin(username.data, password, adminEnv())
@@ -189,7 +204,10 @@ export async function login(
     if ("error" in made) return { error: made.error };
     admin = await q.getAdmin(db, made.id);
   }
-  if (!verifyPassword(password, admin?.passwordHash ?? decoy()) || !admin) {
+  if (
+    !verifyPassword(password, admin?.passwordHash ?? decoy()) ||
+    admin?.role !== role
+  ) {
     return { error: WRONG };
   }
   if (!admin.verified) {
