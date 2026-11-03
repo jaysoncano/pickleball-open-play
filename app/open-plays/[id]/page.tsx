@@ -12,9 +12,11 @@ import {
   RankChip,
 } from "@/components/open-plays/open-play-card";
 import { RankRoster } from "@/components/open-plays/rank-roster";
+import { ReopenSession } from "@/components/open-plays/reopen-session";
 import { ResultsView } from "@/components/open-plays/results-view";
+import { ShareLink } from "@/components/open-plays/share-link";
 import { SignupForm } from "@/components/open-plays/signup-form";
-import { PublicBoard } from "@/components/public-board";
+import { boardTab, PublicBoard } from "@/components/public-board";
 import { currentAdmin, managesOpenPlay } from "@/lib/auth-server";
 import { getDb } from "@/lib/db/client";
 import {
@@ -24,11 +26,13 @@ import {
   pairMembers,
   type OpenPlay,
   hasEndedSession,
+  liveSessionGames,
   openPlayGames,
   openPlayMatches,
   rosterPairs,
 } from "@/lib/db/queries";
 import { LEVEL_INFO, LevelSchema, type Level } from "@/lib/ranking/levels";
+import { resultPairs } from "@/lib/ranking/standings";
 import { formatMoney, openPlayFee, pairLevel } from "@/lib/registration/forms";
 import { ranksLabel, spotsLeft, whenLabel } from "@/lib/registration/open-play";
 
@@ -68,10 +72,42 @@ async function OpenPlayView({ params, searchParams }: Props) {
     return (
       <ResultsView
         play={play}
-        pairs={pairs.filter((p) => p.paid)}
+        pairs={resultPairs(pairs, games)}
         games={games}
         matches={matches}
         backHref={host ? "/host" : "/"}
+        hostActions={
+          host && (
+            <>
+              <ShareLink openPlayId={id} />
+              <ReopenSession openPlayId={id} />
+            </>
+          )
+        }
+      />
+    );
+  }
+
+  // The shareable watch link: the live board, for anyone (hosts too, to
+  // see what players see). Before the start or after the end, the open
+  // play's own page or results show instead.
+  const query = await searchParams;
+  if (session && query.view === "courts") {
+    const [members, games] = await Promise.all([
+      pairMembers(db, Object.keys(session.players)),
+      liveSessionGames(db, id),
+    ]);
+    return (
+      <PublicBoard
+        session={session}
+        members={Object.fromEntries(members)}
+        games={games}
+        tab={boardTab(query.tab)}
+        baseHref={`/open-plays/${id}?view=courts`}
+        linkProfiles={play.kind === "ranked"}
+        heading={[ranksLabel(play), whenLabel(play), play.venue]
+          .filter(Boolean)
+          .join(" · ")}
       />
     );
   }
@@ -85,25 +121,13 @@ async function OpenPlayView({ params, searchParams }: Props) {
           when: whenLabel(play),
           rank: ranksLabel(play),
           levels: play.levels,
+          kind: play.kind,
         }}
         initial={session}
       />
     );
   }
 
-  const query = await searchParams;
-  if (session && query.view === "courts") {
-    const members = await pairMembers(db, Object.keys(session.players));
-    return (
-      <PublicBoard
-        session={session}
-        members={Object.fromEntries(members)}
-        heading={[ranksLabel(play), whenLabel(play), play.venue]
-          .filter(Boolean)
-          .join(" · ")}
-      />
-    );
-  }
   const rank = LevelSchema.safeParse(query.rank);
   const view =
     rank.success && play.levels.includes(rank.data) ? rank.data : null;
@@ -155,7 +179,7 @@ async function PublicOpenPlay({
               href={`${base}?view=courts`}
               className={`${BUTTON} self-start bg-rose-500 text-white hover:bg-rose-400`}
             >
-              🔴 Live now · watch the courts
+              🔴 Live now · watch courts, rankings &amp; games
             </Link>
           )}
         </div>
@@ -213,9 +237,9 @@ async function PublicOpenPlay({
             ✋ Join at the booth
           </h2>
           <p className="mt-2 text-ink/80">
-            Come to the host&apos;s booth with your partner, give your names,
-            and pay <b>{fee}</b> for your pair. Once you&apos;re paid,
-            you&apos;re in the queue.
+            Come to the host&apos;s booth with your partner and give your names.
+            Once the host checks you in, you&apos;re in the queue. The entry is{" "}
+            <b>{fee}</b> per pair; you can pay at the booth later.
           </p>
           {left === 0 && (
             <p className="mt-3 rounded-2xl bg-rose-100 px-4 py-3 font-semibold text-rose-700">
@@ -236,12 +260,13 @@ async function PublicOpenPlay({
               {LEVEL_INFO[rank].label}.
             </li>
             <li>
-              Pay <b>{fee}</b> for your pair (one entry, paid in full) at the{" "}
-              <b>management booth</b>.
+              <b>Check in at the management booth</b> when you arrive: once the
+              host checks you in, you&apos;re in the queue.
             </li>
             <li>
-              The admin confirms your payment: you&apos;re in the queue, and
-              both of you get a receipt email with a link to your profile.
+              Pay <b>{fee}</b> for your pair (one entry) at the booth, now or
+              later. Once it&apos;s confirmed, both of you get a receipt email
+              with a link to your profile.
             </li>
             <li>
               No partner? Sign up solo at the booth; they&apos;ll pair you.

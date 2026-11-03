@@ -238,7 +238,9 @@ function QueueItem({
               title="Edit name"
               className="group/name flex max-w-full items-center gap-1 rounded-md text-left font-bold hover:text-fuchsia-600 focus-visible:outline-4 focus-visible:outline-sky-400"
             >
-              <span className="truncate">{player.name}</span>
+              <span className="truncate" title={player.name}>
+                {player.name}
+              </span>
               <span
                 aria-hidden
                 className="text-xs text-ink/30 group-hover/name:text-fuchsia-500"
@@ -401,5 +403,72 @@ function MoveButton({
     >
       {children}
     </button>
+  );
+}
+
+/**
+ * The queue for watching (public board): the same cards the host sees,
+ * grouped by game, with rank, games played, and the wait. No moving,
+ * renaming, or removing.
+ */
+export function QueueView({
+  queue,
+  players,
+  capacity,
+  startsIn = {},
+  skip = 0,
+}: {
+  queue: string[];
+  players: Record<string, Player>;
+  capacity: number;
+  startsIn?: Record<string, number>;
+  /** Pairs already shown in Up next: numbering starts after them. */
+  skip?: number;
+}) {
+  const shown = queue.slice(skip);
+  if (shown.length === 0) {
+    return (
+      <p className="rounded-3xl border-2 border-dashed border-ink/15 p-5 text-center text-ink/50">
+        {queue.length === 0
+          ? "Nobody waiting. Everyone's playing! 🎉"
+          : "Nobody else is waiting."}
+      </p>
+    );
+  }
+  return (
+    <ol className="flex flex-col gap-1.5">
+      {shown.map((pid, n) => {
+        const i = n + skip;
+        const player = players[pid];
+        const wait = startsIn[pid];
+        return (
+          <li
+            key={pid}
+            className={`animate-pop-in flex items-center gap-2 rounded-2xl py-1.5 pr-2 pl-2 ring-2 motion-reduce:animate-none ${groupTones[Math.floor(i / capacity) % groupTones.length]}`}
+          >
+            <span className="w-6 text-center font-display text-sm font-bold text-ink/40 tabular-nums">
+              {i + 1}
+            </span>
+            <Avatar name={player?.name ?? "?"} size="sm" />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-bold" title={player?.name}>
+                {player?.name ?? "?"}
+              </span>
+              <span className="block text-xs font-semibold text-ink/50">
+                {player?.skill !== undefined && LEVELS[player.skill] && (
+                  <span className="mr-1.5 align-middle">
+                    <LevelBadge level={LEVELS[player.skill]} size="sm" />
+                  </span>
+                )}
+                {!player || player.gamesPlayed === 0
+                  ? "Fresh legs"
+                  : `${player.gamesPlayed} game${player.gamesPlayed === 1 ? "" : "s"}`}
+                {wait !== undefined && ` · ${waitLabel(wait)}`}
+              </span>
+            </span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }

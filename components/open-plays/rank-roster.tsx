@@ -20,7 +20,9 @@ function Person({ m }: { m: DayMember }) {
         size="md"
       />
       <span className="min-w-0">
-        <span className="block truncate font-bold">{m.name}</span>
+        <span className="block truncate font-bold" title={m.name}>
+          {m.name}
+        </span>
         {m.fullName && (
           <span className="block truncate text-xs font-semibold text-ink/50">
             {m.fullName}

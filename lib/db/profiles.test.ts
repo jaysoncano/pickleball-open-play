@@ -61,6 +61,19 @@ describe("claim tokens", () => {
     expect(await regenerateClaimToken(db, MISSING)).toBeNull();
   });
 
+  it("has no QR claim or code for a Regular open play's guest", async () => {
+    const [gus] = await db
+      .insert(schema.players)
+      .values({ name: "Gus", guest: true })
+      .returning({
+        id: schema.players.id,
+        claimToken: schema.players.claimToken,
+      });
+    expect(await playerByClaimToken(db, gus.claimToken)).toBeNull();
+    expect((await getPlayerPrivate(db, gus.id))?.guest).toBe(true);
+    expect((await getPlayerPrivate(db, ana))?.guest).toBe(false);
+  });
+
   it("reports setup progress and filters by id", async () => {
     await issueEmailCode(db, req());
     await checkEmailCode(db, req());

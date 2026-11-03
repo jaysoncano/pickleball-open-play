@@ -12,6 +12,7 @@ export function UpNextCard({
   timeWarning,
   onEditTime,
   onAddCourt,
+  readOnly = false,
 }: {
   preview: UpNext;
   players: Record<string, Player>;
@@ -21,8 +22,10 @@ export function UpNextCard({
   readyCourts: number;
   /** Waiting players likely to miss out before the end time. */
   timeWarning?: { count: number; unplayed: number; endLabel: string };
-  onEditTime: () => void;
-  onAddCourt: () => void;
+  onEditTime?: () => void;
+  onAddCourt?: () => void;
+  /** Watching (public board): no host hints or buttons. */
+  readOnly?: boolean;
 }) {
   const hasNext = preview.next.length > 0;
 
@@ -58,25 +61,29 @@ export function UpNextCard({
             .
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={onEditTime}
-              className="min-h-10 rounded-full bg-rose-500 px-3 font-display font-semibold text-white hover:bg-rose-400"
-            >
-              ⏱ Add time
-            </button>
-            <button
-              type="button"
-              onClick={onAddCourt}
-              className="min-h-10 rounded-full bg-rose-100 px-3 font-display font-semibold text-rose-700 hover:bg-rose-200"
-            >
-              ＋ Add a court
-            </button>
+            {onEditTime && (
+              <button
+                type="button"
+                onClick={onEditTime}
+                className="min-h-10 rounded-full bg-rose-500 px-3 font-display font-semibold text-white hover:bg-rose-400"
+              >
+                ⏱ Add time
+              </button>
+            )}
+            {onAddCourt && (
+              <button
+                type="button"
+                onClick={onAddCourt}
+                className="min-h-10 rounded-full bg-rose-100 px-3 font-display font-semibold text-rose-700 hover:bg-rose-200"
+              >
+                ＋ Add a court
+              </button>
+            )}
           </div>
         </div>
       )}
 
-      {readyCourts > 0 && (
+      {readyCourts > 0 && !readOnly && (
         <p className="mt-2 inline-flex items-center gap-2 rounded-full bg-amber-300 px-3 py-1 text-sm font-bold text-amber-950">
           <span aria-hidden>👉</span>
           {readyCourts} court{readyCourts === 1 ? " is" : "s are"} ready — tap
@@ -93,7 +100,10 @@ export function UpNextCard({
                 className="animate-pop-in flex min-w-0 items-center gap-2 rounded-2xl bg-white/20 p-2 backdrop-blur motion-reduce:animate-none"
               >
                 <Avatar name={players[pid].name} size="md" />
-                <span className="truncate font-display font-semibold">
+                <span
+                  className="truncate font-display font-semibold"
+                  title={players[pid].name}
+                >
                   {players[pid].name}
                 </span>
               </li>
@@ -110,7 +120,9 @@ export function UpNextCard({
           {preview.remainder.length > 0
             ? `${capacity - preview.remainder.length} more player${capacity - preview.remainder.length === 1 ? "" : "s"} needed for the next game`
             : hasOpenCourt
-              ? "Courts are open — add players to start a game!"
+              ? readOnly
+                ? "Courts are open: waiting for more players."
+                : "Courts are open — add players to start a game!"
               : "Everyone's on court. Finished players rejoin here."}
         </p>
       )}
@@ -131,7 +143,10 @@ export function UpNextCard({
                     <Avatar key={pid} name={players[pid].name} size="sm" />
                   ))}
                 </span>
-                <span className="min-w-0 truncate text-sm text-white/90">
+                <span
+                  className="min-w-0 truncate text-sm text-white/90"
+                  title={group.map((pid) => players[pid].name).join(", ")}
+                >
                   {group.map((pid) => players[pid].name).join(", ")}
                 </span>
               </li>

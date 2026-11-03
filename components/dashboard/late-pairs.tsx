@@ -7,20 +7,22 @@ import type { PairUnit } from "@/components/setup/step-players";
 import { NewPairDialog } from "./new-pair-dialog";
 
 /**
- * Pairs signed up for this open play who aren't in the queue yet. It's
- * running, so no check-in: once paid, they join the queue on their own,
- * at the front.
- * Refreshes, so a pair that just paid at the desk shows up without a
- * reload. "New pair" registers one here; they wait until the host adds
- * them.
+ * Pairs signed up for this open play who aren't in the queue yet. Check
+ * a pair in and it joins the queue on its own, at the front; it can pay
+ * later (the dashboard reminds the host while it plays).
+ * Refreshes, so a pair checked in on another device shows up without a
+ * reload. "New pair" registers one here; it waits until checked in.
  */
 export function LatePairs({
   openPlayId,
   inSession,
+  refreshKey = 0,
   onAdd,
 }: {
   openPlayId: string;
   inSession: string[];
+  /** Bump to look again now (a pair was checked in on the Players tab). */
+  refreshKey?: number;
   onAdd: (pairs: Pick<PairUnit, "id" | "name" | "skill">[]) => void;
 }) {
   const [adding, setAdding] = useState(false);
@@ -29,9 +31,9 @@ export function LatePairs({
   return (
     <section
       aria-labelledby="late-title"
-      className="rounded-3xl border-2 border-dashed border-lime-400 bg-lime-50 p-3"
+      className="rounded-3xl border-2 border-dashed border-lime-400 bg-lime-50 p-3.5 sm:p-4"
     >
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-1">
         <h3
           id="late-title"
           className="font-display text-base font-semibold text-lime-900"
@@ -51,7 +53,7 @@ export function LatePairs({
         exclude={inSession}
         addLabel="Add to queue"
         refreshMs={20_000}
-        version={version}
+        version={version + refreshKey}
         live
         onAdd={async (pairs) =>
           onAdd(

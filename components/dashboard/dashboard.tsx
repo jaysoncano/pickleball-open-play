@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { endOpenPlay, finishMatch, renameAndSave } from "@/app/actions";
 import { useSessionStore } from "@/components/session-provider";
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import type { OpenPlayKind } from "@/lib/registration/open-play";
 import { levelRank, type Level } from "@/lib/ranking/levels";
 import {
   addCourt,
@@ -27,7 +28,13 @@ import {
   swapPlayers,
   upNext,
 } from "@/lib/queue/engine";
-import { forecast } from "@/lib/queue/forecast";
+import { forecast, gamesLeft } from "@/lib/queue/forecast";
+import {
+  startWarning,
+  UNPAID_REMIND_MS,
+  unpaidOnCourtAlerts,
+  type StartWarning,
+} from "@/lib/queue/heads-up";
 import { overtimeAlerts, visibleAlerts } from "@/lib/queue/overtime";
 import type { QueueState } from "@/lib/queue/schema";
 import { useNow } from "@/lib/use-now";
@@ -43,20 +50,27 @@ import { StandingsPanel } from "./standings-panel";
 import { QueueList } from "./queue-list";
 import { SessionBar } from "./session-bar";
 import { StatsRow } from "./stats-row";
-import { OvertimeToasts } from "./overtime-toasts";
+import { HeadsUpToasts } from "./heads-up-toasts";
+import { PaymentsPanel } from "./payments-panel";
+import { PlayersPanel } from "./players-panel";
 import { ScoreDialog } from "./score-dialog";
 import { SessionTimeDialog } from "./session-time-dialog";
+import { StartWarningDialog } from "./start-warning-dialog";
 import { SwapDialog } from "./swap-dialog";
 import { UpNextCard } from "./up-next-card";
 import { useProfileSetup } from "./use-profile-setup";
+import { useUnpaidPairs } from "./use-unpaid-pairs";
 
 export function Dashboard({
   session,
   ranks = [],
+  kind = "ranked",
 }: {
   session: QueueState;
   /** The open play's ranks: courts pick which one they play. */
   ranks?: Level[];
+  /** Regular open plays' guests have no profiles: no Profiles tab. */
+  kind?: OpenPlayKind;
 }) {
   // Apply an engine change now; it saves to the database in the background.
   const { update: act, saveError, openPlayId } = useSessionStore();
@@ -64,15 +78,35 @@ export function Dashboard({
   const now = useNow();
   const [scoringCourt, setScoringCourt] = useState<string | null>(null);
   const [tab, setTab] = useState<
-    "courts" | "profiles" | "history" | "standings"
+    | "courts"
+    | "players"
+    | "rankings"
+    | "profiles"
+    | "history"
+    | "standings"
+    | "payments"
   >("courts");
-  const setup = useProfileSetup(Object.keys(session.players));
+  const payments = useUnpaidPairs(openPlayId);
+  const [signedUp, setSignedUp] = useState<number>();
+  // A pair checked in on the Players tab: the queue looks for it now.
+  const [checkIns, setCheckIns] = useState(0);
+  const onSignedUp = useCallback((n: number) => setSignedUp(n), []);
+  const onCheckedIn = useCallback(() => setCheckIns((n) => n + 1), []);
+  // A game about to start without time to finish: ask first.
+  const [startCheck, setStartCheck] = useState<{
+    courtId: string;
+    courtLabel: string;
+    warning: StartWarning;
+  } | null>(null);
+  const profiles = kind === "ranked";
+  const setup = useProfileSetup(profiles ? Object.keys(session.players) : []);
   const needSetup = setup.filter((r) => r.status !== "complete").length;
   const [swapTarget, setSwapTarget] = useState<string | null>(null);
   const [editingTime, setEditingTime] = useState(false);
   // Snoozed (until a time) or dismissed (Infinity) overtime alerts.
   const [hiddenAlerts, setHiddenAlerts] = useState<Record<string, number>>({});
   const overtime = overtimeAlerts(session, now);
+  const unpaidAlerts = unpaidOnCourtAlerts(session, payments.unpaid);
   const overtimeCourts = new Set(overtime.map((a) => a.courtId));
   const hideAlert = (key: string, until: number) =>
     setHiddenAlerts((h) => ({ ...h, [key]: until }));
@@ -86,6 +120,11 @@ export function Dashboard({
   const preview = upNext(session);
   const summary = stats(session);
   const outlook = forecast(session, now);
+  const estimate = gamesLeft(session, now);
+  const endLabel = new Date(session.endsAt).toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  });
   const timeWarning =
     outlook.atRisk.length > 0
       ? {
@@ -93,10 +132,7 @@ export function Dashboard({
           unplayed: outlook.atRisk.filter(
             (id) => session.players[id].gamesPlayed === 0,
           ).length,
-          endLabel: new Date(session.endsAt).toLocaleTimeString([], {
-            hour: "numeric",
-            minute: "2-digit",
-          }),
+          endLabel,
         }
       : undefined;
 
@@ -106,10 +142,18 @@ export function Dashboard({
     .sort((a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0))[0];
 
   const onRemovePlayer = (id: string) => act((s) => removePlayer(s, id));
+  const start = (courtId: string) => act((s, t) => startGame(s, courtId, t));
+  // Heads-up first when there isn't time for a typical game.
+  const requestStart = (courtId: string, courtLabel: string) => {
+    const warning = startWarning(session, courtId, now);
+    if (warning) setStartCheck({ courtId, courtLabel, warning });
+    else start(courtId);
+  };
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-5 px-4 py-5 sm:gap-6 sm:py-8">
       <SessionBar
+        openPlayId={openPlayId}
         session={session}
         now={now}
         onEditTime={() => setEditingTime(true)}
@@ -129,7 +173,11 @@ export function Dashboard({
         </p>
       )}
 
-      <StatsRow {...summary} courts={session.courts.length} />
+      <StatsRow
+        {...summary}
+        courts={session.courts.length}
+        estimate={estimate}
+      />
 
       <DashboardTabs
         active={tab}
@@ -141,12 +189,18 @@ export function Dashboard({
             emoji: "🎾",
             badge: session.courts.length,
           },
-          {
-            id: "profiles",
-            label: "Profiles",
-            emoji: "📱",
-            badge: needSetup,
-          },
+          { id: "players", label: "Players", emoji: "👥", badge: signedUp },
+          { id: "rankings", label: "Rankings", emoji: "📊" },
+          ...(profiles
+            ? [
+                {
+                  id: "profiles" as const,
+                  label: "Profiles",
+                  emoji: "📱",
+                  badge: needSetup,
+                },
+              ]
+            : []),
           {
             id: "history",
             label: "History",
@@ -154,6 +208,12 @@ export function Dashboard({
             badge: session.matches.length,
           },
           { id: "standings", label: "Standings", emoji: "🥇" },
+          {
+            id: "payments",
+            label: "Payments",
+            emoji: "💰",
+            badge: payments.count,
+          },
         ]}
       />
 
@@ -180,7 +240,7 @@ export function Dashboard({
                   now={now}
                   overtime={overtimeCourts.has(court.id)}
                   canClose={session.courts.length > 1}
-                  onStart={() => act((s, t) => startGame(s, court.id, t))}
+                  onStart={() => requestStart(court.id, court.label)}
                   onPause={() => act((s, t) => pauseGame(s, court.id, t))}
                   onResume={() => act((s, t) => resumeGame(s, court.id, t))}
                   onCancel={() => act((s) => cancelGame(s, court.id))}
@@ -208,11 +268,6 @@ export function Dashboard({
               </button>
             </li>
           </ul>
-          <RankingsPreview
-            openPlayId={openPlayId}
-            session={session}
-            active={tab === "courts"}
-          />
         </section>
 
         <aside className="flex flex-col gap-5">
@@ -244,6 +299,7 @@ export function Dashboard({
               <LatePairs
                 openPlayId={openPlayId}
                 inSession={Object.keys(session.players)}
+                refreshKey={checkIns}
                 // Paid late: first in line, so games stay balanced.
                 onAdd={(pairs) => act((s, t) => addLatePairs(s, pairs, t))}
               />
@@ -274,9 +330,29 @@ export function Dashboard({
         </aside>
       </div>
 
-      <div {...tabPanelProps("profiles")} hidden={tab !== "profiles"}>
-        <ProfilesPanel rows={setup} />
+      <div {...tabPanelProps("players")} hidden={tab !== "players"}>
+        <PlayersPanel
+          openPlayId={openPlayId}
+          session={session}
+          active={tab === "players"}
+          onCount={onSignedUp}
+          onCheckedIn={onCheckedIn}
+        />
       </div>
+
+      <div {...tabPanelProps("rankings")} hidden={tab !== "rankings"}>
+        <RankingsPreview
+          openPlayId={openPlayId}
+          session={session}
+          active={tab === "rankings"}
+        />
+      </div>
+
+      {profiles && (
+        <div {...tabPanelProps("profiles")} hidden={tab !== "profiles"}>
+          <ProfilesPanel rows={setup} />
+        </div>
+      )}
 
       <div
         {...tabPanelProps("history")}
@@ -297,12 +373,41 @@ export function Dashboard({
         />
       </div>
 
-      <OvertimeToasts
-        alerts={visibleAlerts(overtime, hiddenAlerts, now)}
+      <div {...tabPanelProps("payments")} hidden={tab !== "payments"}>
+        <PaymentsPanel
+          openPlayId={openPlayId}
+          active={tab === "payments"}
+          onChanged={payments.reload}
+        />
+      </div>
+
+      <HeadsUpToasts
+        overtime={visibleAlerts(overtime, hiddenAlerts, now)}
+        unpaid={visibleAlerts(unpaidAlerts, hiddenAlerts, now)}
         limitMinutes={session.config.overtimeMinutes}
-        onSnooze={(key) => hideAlert(key, Date.now() + 5 * 60_000)}
+        remindMinutes={UNPAID_REMIND_MS / 60_000}
+        onSnooze={(key, minutes) =>
+          hideAlert(key, Date.now() + minutes * 60_000)
+        }
         onDismiss={(key) => hideAlert(key, Infinity)}
       />
+
+      {startCheck && (
+        <StartWarningDialog
+          courtLabel={startCheck.courtLabel}
+          warning={startCheck.warning}
+          endLabel={endLabel}
+          onStart={() => {
+            start(startCheck.courtId);
+            setStartCheck(null);
+          }}
+          onEditTime={() => {
+            setStartCheck(null);
+            setEditingTime(true);
+          }}
+          onClose={() => setStartCheck(null)}
+        />
+      )}
 
       {editingTime && (
         <SessionTimeDialog
@@ -327,7 +432,7 @@ export function Dashboard({
           players={session.players}
           onSave={(score) => {
             act(
-              (s, t) => finishGame(s, scoringCourt, t),
+              (s, t) => finishGame(s, scoringCourt, t, Math.random, score),
               (next) =>
                 finishMatch(openPlayId, next, next.matches.at(-1), score),
             );

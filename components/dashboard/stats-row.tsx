@@ -1,15 +1,20 @@
+import type { GamesLeft } from "@/lib/queue/forecast";
+
 export function StatsRow({
   total,
   playing,
   waiting,
   games,
   courts,
+  estimate,
 }: {
   total: number;
   playing: number;
   waiting: number;
   games: number;
   courts: number;
+  /** Games that still fit before the end, and about how many each. */
+  estimate?: GamesLeft;
 }) {
   const tiles = [
     { label: "Players", value: total, tone: "bg-violet-100 text-violet-900" },
@@ -22,9 +27,12 @@ export function StatsRow({
     },
     { label: "Games", value: games, tone: "bg-fuchsia-100 text-fuchsia-900" },
   ];
+  const each = estimate?.each ?? 0;
 
   return (
-    <dl className="grid grid-cols-3 gap-2 sm:grid-cols-5 sm:gap-3">
+    <dl
+      className={`grid grid-cols-3 gap-2 sm:gap-3 ${estimate ? "sm:grid-cols-6" : "sm:grid-cols-5"}`}
+    >
       {tiles.map((t, i) => (
         <div
           key={t.label}
@@ -36,6 +44,26 @@ export function StatsRow({
           <dd className="font-display text-3xl font-bold">{t.value}</dd>
         </div>
       ))}
+      {estimate && (
+        <div
+          title="Estimate from the average game length and the time left"
+          className="col-span-3 rounded-3xl bg-gradient-to-br from-fuchsia-500 to-violet-500 px-3 py-3 text-white ring-2 ring-white sm:col-span-1 sm:px-4"
+        >
+          <dt className="text-xs font-bold tracking-wide uppercase opacity-80">
+            Games left (est.)
+          </dt>
+          <dd className="flex items-baseline gap-2 sm:block">
+            <span className="font-display text-3xl font-bold tabular-nums">
+              ~{estimate.games}
+            </span>
+            <span className="block text-xs font-semibold opacity-90">
+              {estimate.games === 0
+                ? "No time for another game"
+                : `≈ ${each} more game${each === 1 ? "" : "s"} each`}
+            </span>
+          </dd>
+        </div>
+      )}
     </dl>
   );
 }

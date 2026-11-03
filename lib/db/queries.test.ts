@@ -16,6 +16,8 @@ import {
   registerPair,
   sharedOpenPlay,
   endSession,
+  hasEndedSession,
+  reopenSession,
   ensurePlayers,
   getLiveSession,
   listLiveSessions,
@@ -174,6 +176,19 @@ describe("sessions", () => {
     await endSession(db, other);
     expect(await getLiveSession(db, op)).not.toBeNull();
     expect(await getLiveSession(db, other)).toBeNull();
+  });
+
+  it("reopens an ended session as it was", async () => {
+    const state = newSession(await ensurePlayers(db, ["Ana", "Ben"]));
+    expect(await reopenSession(db, op)).toBe(false); // never ran
+    await startSession(db, op, state);
+    expect(await reopenSession(db, op)).toBe(false); // still running
+    await endSession(db, op);
+    expect(await hasEndedSession(db, op)).toBe(true);
+    expect(await reopenSession(db, op)).toBe(true);
+    expect(await getLiveSession(db, op)).toEqual(state);
+    expect(await hasEndedSession(db, op)).toBe(false);
+    expect(await reopenSession(db, "not-a-uuid")).toBe(false);
   });
 });
 

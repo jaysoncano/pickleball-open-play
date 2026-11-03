@@ -17,8 +17,10 @@ export function useProfileSetup(playerIds: string[]): SetupRow[] {
   const key = [...playerIds].sort().join(",");
 
   useEffect(() => {
+    // Nobody to check (or a Regular open play's guests): no polling.
+    if (!key) return;
     let live = true;
-    const ids = key ? key.split(",") : [];
+    const ids = key.split(",");
     const load = () => {
       if (document.visibilityState !== "visible") return;
       profileSetup(ids)

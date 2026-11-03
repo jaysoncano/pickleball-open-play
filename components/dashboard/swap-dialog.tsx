@@ -99,7 +99,9 @@ function Group({
             >
               <Avatar name={c.name} size="md" />
               <span className="min-w-0 flex-1">
-                <span className="block truncate font-bold">{c.name}</span>
+                <span className="block truncate font-bold" title={c.name}>
+                  {c.name}
+                </span>
                 <span className="block text-xs font-semibold text-ink/50">
                   {c.where.kind === "queue"
                     ? `#${c.where.position} in line`

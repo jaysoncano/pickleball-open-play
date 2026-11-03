@@ -6,6 +6,7 @@ import {
   readPlayerToken,
 } from "@/lib/profile/verify";
 import {
+  amountDue,
   ConfirmPaymentSchema,
   feeCents,
   formatMoney,
@@ -123,6 +124,13 @@ describe("money", () => {
     expect(formatMoney(15000, "PHP")).toBe("₱150.00");
     expect(formatMoney(250, "USD")).toBe("$2.50");
     expect(formatMoney(100, "nope!")).toBe("nope! 1.00");
+  });
+
+  it("totals what unpaid pairs owe", () => {
+    expect(amountDue(3, 15000)).toBe(45000);
+    expect(amountDue(0, 15000)).toBe(0);
+    expect(amountDue(2, 0)).toBe(0);
+    expect(amountDue(-1, 15000)).toBe(0);
   });
 
   it("reads fee and currency from env", () => {
@@ -250,42 +258,32 @@ describe("notReady", () => {
     ],
     ...over,
   });
+  const away = [
+    { name: "Ana", checkedIn: false },
+    { name: "Ben", checkedIn: true },
+  ];
 
-  it("is ready once paid, the right rank, and both checked in", () => {
+  it("is ready once the right rank and both checked in", () => {
     expect(notReady(pair())).toBeNull();
   });
 
-  it("asks for payment first, then rank, then check-in", () => {
-    expect(notReady(pair({ paid: false, blocked: "x" }))).toBe(
-      "Not paid yet. Confirm the payment at the desk.",
+  it("lets unpaid pairs play: they can pay later", () => {
+    expect(notReady(pair({ paid: false }))).toBeNull();
+  });
+
+  it("asks for the rank first, then check-in", () => {
+    expect(notReady(pair({ blocked: "Ana is Pro", members: away }))).toBe(
+      "Ana is Pro",
     );
-    expect(notReady(pair({ blocked: "Ana is Pro" }))).toBe("Ana is Pro");
+    expect(notReady(pair({ members: away }))).toBe("Check in Ana first");
     expect(
       notReady(
         pair({
-          members: [
-            { name: "Ana", checkedIn: false },
-            { name: "Ben", checkedIn: false },
-          ],
+          paid: false,
+          members: away.map((m) => ({ ...m, checkedIn: false })),
         }),
       ),
     ).toBe("Check in Ana & Ben first");
-  });
-
-  it("needs no check-in once the open play is live", () => {
-    const away = pair({
-      members: [
-        { name: "Ana", checkedIn: false },
-        { name: "Ben", checkedIn: false },
-      ],
-    });
-    expect(notReady(away, { live: true })).toBeNull();
-    expect(notReady(pair({ paid: false }), { live: true })).toBe(
-      "Not paid yet. Confirm the payment at the desk.",
-    );
-    expect(notReady(pair({ blocked: "Ana is Pro" }), { live: true })).toBe(
-      "Ana is Pro",
-    );
   });
 });
 

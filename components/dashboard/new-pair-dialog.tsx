@@ -7,8 +7,9 @@ import { DeskForms } from "@/components/admin/register-form";
 import { Modal } from "@/components/ui/modal";
 
 /**
- * Register a pair while the open play is live. Unpaid, they wait under
- * "Not in the queue yet"; once paid, they join the queue at the front.
+ * Register a pair while the open play is live. They wait under "Not in
+ * the queue yet"; once checked in, they join the queue at the front,
+ * paid or not.
  */
 export function NewPairDialog({
   openPlayId,

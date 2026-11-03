@@ -30,10 +30,10 @@ export function overtimeAlerts(
 }
 
 /** Hide alerts that are snoozed (key → until when) or dismissed (Infinity). */
-export function visibleAlerts(
-  alerts: OvertimeAlert[],
+export function visibleAlerts<A extends { key: string }>(
+  alerts: A[],
   hidden: Record<string, number>,
   now: number,
-): OvertimeAlert[] {
+): A[] {
   return alerts.filter((a) => !(hidden[a.key] > now));
 }

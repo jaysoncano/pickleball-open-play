@@ -54,7 +54,9 @@ export function ProfilesPanel({ rows }: { rows: SetupRow[] }) {
               >
                 <Avatar name={r.name} size="sm" />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-bold">{r.name}</span>
+                  <span className="block truncate font-bold" title={r.name}>
+                    {r.name}
+                  </span>
                   {r.missing.length > 0 && (
                     <span className="block text-xs font-semibold text-ink/50">
                       {r.missing.join(" · ")}

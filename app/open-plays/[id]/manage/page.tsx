@@ -25,6 +25,7 @@ import {
   listRegistrations,
   venueSuggestions,
 } from "@/lib/db/queries";
+import { ShareLink } from "@/components/open-plays/share-link";
 import { formatMoney, openPlayFee } from "@/lib/registration/forms";
 import { spotsLeft, whenLabel, KIND_INFO } from "@/lib/registration/open-play";
 import { ROLE_INFO, venueLabel } from "@/lib/roles";
@@ -106,19 +107,22 @@ async function Manage({ params, searchParams }: Props) {
           )}
         </PlayHeader>
         <div className="flex flex-col gap-3 p-4 pt-2 sm:px-6 sm:pb-6">
-          <div>
-            <p className="text-sm font-bold tracking-wide text-fuchsia-600 uppercase">
-              ⚙️ Manage open play
-            </p>
-            <h1 className="font-display text-3xl font-bold">
-              {whenLabel(play)}
-            </h1>
-            <p className="font-semibold text-ink/60">
-              <span className="mr-2 rounded-full bg-fuchsia-100 px-2 py-0.5 text-sm font-bold text-fuchsia-800">
-                {KIND_INFO[play.kind].label}
-              </span>
-              {venueLabel(play) || "Venue to be announced"}
-            </p>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold tracking-wide text-fuchsia-600 uppercase">
+                ⚙️ Manage open play
+              </p>
+              <h1 className="font-display text-3xl font-bold">
+                {whenLabel(play)}
+              </h1>
+              <p className="font-semibold text-ink/60">
+                <span className="mr-2 rounded-full bg-fuchsia-100 px-2 py-0.5 text-sm font-bold text-fuchsia-800">
+                  {KIND_INFO[play.kind].label}
+                </span>
+                {venueLabel(play) || "Venue to be announced"}
+              </p>
+            </div>
+            <ShareLink openPlayId={play.id} />
           </div>
           <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Stat label="Paid pairs" value={play.pairCount} />

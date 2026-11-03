@@ -1,5 +1,7 @@
-import { Fragment } from "react";
+import Link from "next/link";
+import { Fragment, type ReactNode } from "react";
 import { courtTheme } from "@/components/court-theme";
+import { LevelBadge } from "@/components/level-badge";
 import { Avatar } from "@/components/ui/avatar";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { courtStatus } from "@/lib/queue/engine";
@@ -68,12 +70,6 @@ export function CourtCard({
   const paused = status === "paused";
   const pausedAt = formatClock(court.stoppedAfterMs ?? 0);
   const openSlots = capacity - court.playerIds.length;
-  const slots: (string | null)[] = [
-    ...court.playerIds,
-    ...Array<null>(Math.max(0, openSlots)).fill(null),
-  ];
-  const perSide = capacity / 2;
-  const sides = [slots.slice(0, perSide), slots.slice(perSide)];
 
   return (
     <article
@@ -109,29 +105,12 @@ export function CourtCard({
           )}
         </h3>
         <div className="flex items-center gap-1">
-          {court.startedAt !== null ? (
-            <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-mono text-sm font-semibold tabular-nums ${overtime ? "bg-rose-500 text-white" : "bg-white"}`}
-              title={overtime ? "Over the time limit" : "Game time"}
-            >
-              {overtime ? (
-                <span aria-hidden>⏰</span>
-              ) : (
-                <span
-                  aria-hidden
-                  className="size-2 animate-pulse-soft rounded-full bg-lime-500 motion-reduce:animate-none"
-                />
-              )}
-              {formatClock(now - court.startedAt)}
-              {overtime && <span className="sr-only"> (over time)</span>}
-            </span>
-          ) : (
-            <span
-              className={`rounded-full px-3 py-1 text-sm font-semibold ${paused ? "bg-amber-500 text-white" : status === "ready" ? "bg-amber-300 text-amber-950" : "bg-white/70 text-ink/50"}`}
-            >
-              {paused ? `⏸ Paused · ${pausedAt}` : STATUS_LABEL[status]}
-            </span>
-          )}
+          <CourtClock
+            court={court}
+            capacity={capacity}
+            now={now}
+            overtime={overtime}
+          />
           {canClose && !locked && (
             <ConfirmButton
               label={`Close ${court.label}`}
@@ -144,51 +123,47 @@ export function CourtCard({
         </div>
       </div>
 
-      {/* Side A over side B, each pair on its own full-width row. */}
-      <div
-        className={`relative flex flex-1 flex-col justify-center gap-2 rounded-3xl p-3 ${theme.surface}`}
-      >
-        <span
-          aria-hidden
-          className="pointer-events-none absolute inset-1.5 rounded-[1.25rem] border-2 border-white/70"
-        />
-        {sides.map((side, s) => (
-          <Fragment key={s}>
-            {s === 1 && (
-              <div aria-hidden className="relative flex items-center gap-2">
-                <span className="h-1 flex-1 rounded-full bg-white" />
-                <span className="rounded-full bg-white px-2.5 py-0.5 font-display text-xs font-black text-ink/60">
-                  VS
+      <CourtSurface
+        court={court}
+        capacity={capacity}
+        colorIndex={colorIndex}
+        seat={(pid) => (
+          <SeatedPlayer
+            key={pid}
+            name={players[pid].name}
+            skill={players[pid].skill}
+            actions={
+              locked ? (
+                <span
+                  title="Locked while playing"
+                  className="flex size-8 shrink-0 items-center justify-center text-xs opacity-40"
+                >
+                  <span aria-hidden>🔒</span>
+                  <span className="sr-only">Locked while playing</span>
                 </span>
-                <span className="h-1 flex-1 rounded-full bg-white" />
-              </div>
-            )}
-            <ul
-              aria-label={s === 0 ? "Side A" : "Side B"}
-              className="relative flex flex-col gap-2"
-            >
-              {side.map((pid, i) =>
-                pid ? (
-                  <SeatedPlayer
-                    key={pid}
-                    name={players[pid].name}
-                    locked={locked}
-                    onSwap={() => onSwap(pid)}
-                    onRemove={() => onRemovePlayer(pid)}
-                  />
-                ) : (
-                  <li
-                    key={`open-${i}`}
-                    className="flex min-h-12 items-center justify-center rounded-2xl border-2 border-dashed border-white/80 text-sm font-semibold text-white"
+              ) : (
+                <span className="flex shrink-0 items-center">
+                  <button
+                    type="button"
+                    aria-label={`Swap ${players[pid].name} with another pair`}
+                    onClick={() => onSwap(pid)}
+                    className="relative flex size-8 items-center justify-center rounded-full text-base font-bold text-sky-500 after:absolute after:-inset-1 hover:bg-sky-100 hover:text-sky-700"
                   >
-                    Open
-                  </li>
-                ),
-              )}
-            </ul>
-          </Fragment>
-        ))}
-      </div>
+                    ⇄
+                  </button>
+                  <ConfirmButton
+                    label={`Remove ${players[pid].name}`}
+                    onConfirm={() => onRemovePlayer(pid)}
+                    className="size-8 text-ink/35 hover:bg-rose-100 hover:text-rose-600"
+                  >
+                    ×
+                  </ConfirmButton>
+                </span>
+              )
+            }
+          />
+        )}
+      />
 
       {paused ? (
         <p
@@ -277,59 +252,228 @@ export function CourtCard({
   );
 }
 
+/**
+ * A court for watching: the same card the host sees, with no buttons.
+ * Names link to profiles when `team` members are given and `link` is on.
+ */
+export function CourtView({
+  court,
+  colorIndex,
+  capacity,
+  players,
+  now,
+  teams = {},
+  link = false,
+}: {
+  court: Court;
+  colorIndex: number;
+  capacity: number;
+  players: Record<string, Player>;
+  now: number;
+  /** Each pair's players, so names can link to profiles. */
+  teams?: Record<string, { id: string; name: string }[]>;
+  link?: boolean;
+}) {
+  const theme = courtTheme(colorIndex);
+  const rank = court.rank === null ? null : LEVELS[court.rank];
+  return (
+    <article
+      aria-label={court.label}
+      className={`flex h-full flex-col gap-3 rounded-[2rem] p-3 ring-2 sm:p-4 ${theme.card}`}
+    >
+      <div className="flex items-center justify-between gap-2 px-1">
+        <h3 className="flex flex-wrap items-center gap-2 font-display text-xl font-bold">
+          <span className={`rounded-xl px-2.5 py-0.5 ${theme.badge}`}>
+            {court.label}
+          </span>
+          {rank && (
+            <span
+              className={`rounded-xl px-2 py-0.5 font-sans text-sm font-bold ${LEVEL_INFO[rank].tone}`}
+            >
+              {LEVEL_INFO[rank].label}
+            </span>
+          )}
+        </h3>
+        <CourtClock court={court} capacity={capacity} now={now} />
+      </div>
+      <CourtSurface
+        court={court}
+        capacity={capacity}
+        colorIndex={colorIndex}
+        seat={(pid) => (
+          <SeatedPlayer
+            key={pid}
+            name={players[pid]?.name ?? "?"}
+            skill={players[pid]?.skill}
+            team={teams[pid]}
+            link={link}
+          />
+        )}
+      />
+    </article>
+  );
+}
+
+/** The game clock while playing, otherwise the court's status. */
+function CourtClock({
+  court,
+  capacity,
+  now,
+  overtime = false,
+}: {
+  court: Court;
+  capacity: number;
+  now: number;
+  overtime?: boolean;
+}) {
+  const status = courtStatus(court, capacity);
+  if (court.startedAt !== null) {
+    return (
+      <span
+        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-mono text-sm font-semibold tabular-nums ${overtime ? "bg-rose-500 text-white" : "bg-white"}`}
+        title={overtime ? "Over the time limit" : "Game time"}
+      >
+        {overtime ? (
+          <span aria-hidden>⏰</span>
+        ) : (
+          <span
+            aria-hidden
+            className="size-2 animate-pulse-soft rounded-full bg-lime-500 motion-reduce:animate-none"
+          />
+        )}
+        {/* The clock starts on the client (now is 0 on the server). */}
+        {now ? formatClock(now - court.startedAt) : "··:··"}
+        {overtime && <span className="sr-only"> (over time)</span>}
+      </span>
+    );
+  }
+  const paused = status === "paused";
+  return (
+    <span
+      className={`rounded-full px-3 py-1 text-sm font-semibold ${paused ? "bg-amber-500 text-white" : status === "ready" ? "bg-amber-300 text-amber-950" : "bg-white/70 text-ink/50"}`}
+    >
+      {paused
+        ? `⏸ Paused · ${formatClock(court.stoppedAfterMs ?? 0)}`
+        : STATUS_LABEL[status]}
+    </span>
+  );
+}
+
+/** Side A over side B, each pair on its own full-width row. */
+function CourtSurface({
+  court,
+  capacity,
+  colorIndex,
+  seat,
+}: {
+  court: Court;
+  capacity: number;
+  colorIndex: number;
+  seat: (id: string) => ReactNode;
+}) {
+  const theme = courtTheme(colorIndex);
+  const openSlots = capacity - court.playerIds.length;
+  const slots: (string | null)[] = [
+    ...court.playerIds,
+    ...Array<null>(Math.max(0, openSlots)).fill(null),
+  ];
+  const perSide = capacity / 2;
+  const sides = [slots.slice(0, perSide), slots.slice(perSide)];
+  return (
+    <div
+      className={`relative flex flex-1 flex-col justify-center gap-2 rounded-3xl p-3 ${theme.surface}`}
+    >
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-1.5 rounded-[1.25rem] border-2 border-white/70"
+      />
+      {sides.map((side, s) => (
+        <Fragment key={s}>
+          {s === 1 && (
+            <div aria-hidden className="relative flex items-center gap-2">
+              <span className="h-1 flex-1 rounded-full bg-white" />
+              <span className="rounded-full bg-white px-2.5 py-0.5 font-display text-xs font-black text-ink/60">
+                VS
+              </span>
+              <span className="h-1 flex-1 rounded-full bg-white" />
+            </div>
+          )}
+          <ul
+            aria-label={s === 0 ? "Side A" : "Side B"}
+            className="relative flex flex-col gap-2"
+          >
+            {side.map((pid, i) =>
+              pid ? (
+                seat(pid)
+              ) : (
+                <li
+                  key={`open-${i}`}
+                  className="flex min-h-12 items-center justify-center rounded-2xl border-2 border-dashed border-white/80 text-sm font-semibold text-white"
+                >
+                  Open
+                </li>
+              ),
+            )}
+          </ul>
+        </Fragment>
+      ))}
+    </div>
+  );
+}
+
 /** A pair on court: both players side by side, names in full. */
 function SeatedPlayer({
   name,
-  locked,
-  onSwap,
-  onRemove,
+  team,
+  link = false,
+  skill,
+  actions,
 }: {
   name: string;
-  locked: boolean;
-  onSwap: () => void;
-  onRemove: () => void;
+  /** The pair's rank, shown as a badge. */
+  skill?: number;
+  /** The pair's players by id, for profile links. */
+  team?: { id: string; name: string }[];
+  link?: boolean;
+  /** Host buttons (swap, remove) or the lock while playing. */
+  actions?: ReactNode;
 }) {
   // Pairs are named "Ana & Ben"; show each player with their own avatar.
-  const people = name.split(" & ");
+  const people = team ?? name.split(" & ").map((n) => ({ id: "", name: n }));
   return (
     <li className="animate-pop-in flex min-h-12 items-center gap-2 rounded-2xl bg-white py-1.5 pr-1.5 pl-2 shadow-sm motion-reduce:animate-none">
       <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
-        {people.map((person, i) => (
-          <span key={i} className="flex min-w-0 items-center gap-1.5">
-            <Avatar name={person} size="sm" />
-            <span className="font-display text-base font-bold break-words">
-              {person}
+        {people.map((person, i) => {
+          const body = (
+            <>
+              <Avatar name={person.name} size="sm" />
+              <span
+                className="font-display text-base font-bold break-words"
+                title={person.name}
+              >
+                {person.name}
+              </span>
+            </>
+          );
+          return link && person.id ? (
+            <Link
+              key={person.id}
+              href={`/players/${person.id}`}
+              className="flex min-w-0 items-center gap-1.5 rounded-xl hover:text-fuchsia-600"
+            >
+              {body}
+            </Link>
+          ) : (
+            <span key={i} className="flex min-w-0 items-center gap-1.5">
+              {body}
             </span>
-          </span>
-        ))}
+          );
+        })}
+        {skill !== undefined && LEVELS[skill] && (
+          <LevelBadge level={LEVELS[skill]} size="sm" />
+        )}
       </span>
-      {locked ? (
-        <span
-          title="Locked while playing"
-          className="flex size-8 shrink-0 items-center justify-center text-xs opacity-40"
-        >
-          <span aria-hidden>🔒</span>
-          <span className="sr-only">Locked while playing</span>
-        </span>
-      ) : (
-        <span className="flex shrink-0 items-center">
-          <button
-            type="button"
-            aria-label={`Swap ${name} with another pair`}
-            onClick={onSwap}
-            className="relative flex size-8 items-center justify-center rounded-full text-base font-bold text-sky-500 after:absolute after:-inset-1 hover:bg-sky-100 hover:text-sky-700"
-          >
-            ⇄
-          </button>
-          <ConfirmButton
-            label={`Remove ${name}`}
-            onConfirm={onRemove}
-            className="size-8 text-ink/35 hover:bg-rose-100 hover:text-rose-600"
-          >
-            ×
-          </ConfirmButton>
-        </span>
-      )}
+      {actions}
     </li>
   );
 }

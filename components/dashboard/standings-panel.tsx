@@ -208,7 +208,9 @@ function StandingRow({ row, leader }: { row: Standing; leader: boolean }) {
       <Avatar name={row.name} size="sm" />
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-2">
-          <span className="truncate font-bold">{row.name}</span>
+          <span className="truncate font-bold" title={row.name}>
+            {row.name}
+          </span>
           {level && <LevelBadge level={level} size="sm" />}
           {first && leader && (
             <span className="rounded-full bg-amber-300 px-2 text-xs font-bold text-amber-950">

@@ -54,7 +54,10 @@ export function ScoreDialog({
               {ids.map((id) => (
                 <li key={id} className="flex min-w-0 items-center gap-2">
                   <Avatar name={players[id]?.name ?? "?"} size="sm" />
-                  <span className="truncate font-bold">
+                  <span
+                    className="truncate font-bold"
+                    title={players[id]?.name}
+                  >
                     {players[id]?.name}
                   </span>
                 </li>

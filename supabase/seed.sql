@@ -294,7 +294,8 @@ select
       jsonb_build_object('courtLabel', 'Court 1',
         'playerIds', jsonb_build_array('d0000000-0000-4000-8000-000000000018', 'd0000000-0000-4000-8000-000000000019'),
         'playerNames', jsonb_build_array('Sam C. & Tess D.', 'Uma E. & Vic F.'),
-        'startedAt', t.ms - 30 * 60000, 'endedAt', t.ms - 12 * 60000)
+        'startedAt', t.ms - 30 * 60000, 'endedAt', t.ms - 12 * 60000,
+        'score', jsonb_build_object('scoreA', 11, 'scoreB', 7))
     ),
     'history', jsonb_build_object(
       'teammates', '{}'::jsonb,

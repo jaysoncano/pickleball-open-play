@@ -54,3 +54,39 @@ export function forecast(state: QueueState, now: number): Forecast {
       : state.queue.filter((id) => now + startsIn[id] >= state.endsAt);
   return { gameMs, startsIn, atRisk };
 }
+
+export type GamesLeft = {
+  /** Games that can still finish before the end, counting those on court. */
+  games: number;
+  /** About how many more games that gives each player (or pair). */
+  each: number;
+};
+
+/**
+ * How many more games fit before the session ends: each court finishes
+ * what it's playing, then fits as many average-length games as it can.
+ * Spread over everyone, that's roughly how many more each one plays.
+ */
+export function gamesLeft(state: QueueState, now: number): GamesLeft {
+  const gameMs = averageGameMs(state.matches);
+  let games = 0;
+  for (const court of state.courts) {
+    let freeAt = now;
+    if (court.startedAt !== null) {
+      games += 1;
+      freeAt = Math.max(now, court.startedAt + gameMs);
+    } else if (court.stoppedAfterMs !== null) {
+      games += 1;
+      freeAt = now + Math.max(0, gameMs - court.stoppedAfterMs);
+    }
+    if (state.endsAt > freeAt) {
+      games += Math.floor((state.endsAt - freeAt) / gameMs);
+    }
+  }
+  const people = Object.keys(state.players).length;
+  const seats = games * state.config.playersPerCourt;
+  return {
+    games,
+    each: people === 0 ? 0 : Math.floor((seats / people) * 10) / 10,
+  };
+}

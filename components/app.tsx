@@ -24,7 +24,7 @@ export function App({
 function AdminView({ openPlay }: { openPlay: OpenPlaySummary }) {
   const { session } = useSessionStore();
   return session ? (
-    <Dashboard session={session} ranks={openPlay.levels} />
+    <Dashboard session={session} ranks={openPlay.levels} kind={openPlay.kind} />
   ) : (
     <SetupWizard openPlay={openPlay} />
   );

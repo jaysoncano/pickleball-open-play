@@ -4,6 +4,7 @@ import {
   deskRows,
   filterCounts,
   filterRows,
+  paymentTotals,
   randomPartner,
   rowMembers,
   shufflePairs,
@@ -151,5 +152,29 @@ describe("shufflePairs", () => {
     expect(odd.pairs).toHaveLength(1);
     expect(odd.left).not.toBeNull();
     expect(shufflePairs([], Math.random)).toEqual({ pairs: [], left: null });
+  });
+});
+
+describe("paymentTotals", () => {
+  it("sums what paid pairs paid and what unpaid pairs owe", () => {
+    expect(paymentTotals(day, 15000)).toEqual({
+      paidCents: 60000,
+      paidCount: 2,
+      unpaidCents: 15000,
+      unpaidCount: 1,
+      totalCents: 75000,
+      totalCount: 3,
+    });
+  });
+
+  it("is zero with no pairs", () => {
+    expect(paymentTotals({ pairs: [], pending: [] }, 15000)).toEqual({
+      paidCents: 0,
+      paidCount: 0,
+      unpaidCents: 0,
+      unpaidCount: 0,
+      totalCents: 0,
+      totalCount: 0,
+    });
   });
 });

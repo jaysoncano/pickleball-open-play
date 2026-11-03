@@ -321,9 +321,12 @@ export async function getPlayerPrivate(
   claimToken: string;
   username: string | null;
   hasPassword: boolean;
+  /** A Regular open play's guest: no profile, so no QR code. */
+  guest: boolean;
 } | null> {
   const [row] = await db
     .select({
+      guest: players.guest,
       username: players.username,
       hasPassword: sql<boolean>`${players.passwordHash} is not null`,
       email: players.email,
@@ -336,7 +339,7 @@ export async function getPlayerPrivate(
   return row ?? null;
 }
 
-/** The player a QR code belongs to. */
+/** The player a QR code belongs to. Guests have no profile to claim. */
 export async function playerByClaimToken(
   db: Db,
   token: string,
@@ -344,7 +347,7 @@ export async function playerByClaimToken(
   const [row] = await db
     .select({ id: players.id, name: players.name, email: players.email })
     .from(players)
-    .where(eq(players.claimToken, token));
+    .where(and(eq(players.claimToken, token), eq(players.guest, false)));
   return row ?? null;
 }
 
@@ -2227,6 +2230,34 @@ export async function endSession(db: Db, openPlayId: string): Promise<void> {
     .update(sessions)
     .set({ status: "ended", updatedAt: new Date() })
     .where(live(openPlayId));
+}
+
+/**
+ * Undo an accidental "End session": the last ended session runs again,
+ * with its queue, courts, and games as they were. False when the open play
+ * is already running or never ran.
+ */
+export async function reopenSession(
+  db: Db,
+  openPlayId: string,
+): Promise<boolean> {
+  if (!z.uuid().safeParse(openPlayId).success) return false;
+  if (await getLiveSession(db, openPlayId)) return false;
+  const [last] = await db
+    .select({ id: sessions.id })
+    .from(sessions)
+    .where(
+      and(eq(sessions.openPlayId, openPlayId), eq(sessions.status, "ended")),
+    )
+    .orderBy(desc(sessions.updatedAt))
+    .limit(1);
+  if (!last) return false;
+  const rows = await db
+    .update(sessions)
+    .set({ status: "active", updatedAt: new Date() })
+    .where(eq(sessions.id, last.id))
+    .returning({ id: sessions.id });
+  return rows.length > 0;
 }
 
 // ── Matches ────────────────────────────────────────────────────────────────

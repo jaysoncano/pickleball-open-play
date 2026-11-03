@@ -241,3 +241,15 @@ export function finalStandings(
     }));
   return [...played, ...idle];
 }
+
+/**
+ * The pairs a finished open play's results list: everyone who played a
+ * game (paid or paying later) plus paid pairs who didn't get to play.
+ */
+export function resultPairs<P extends { id: string; paid: boolean }>(
+  pairs: P[],
+  games: Pick<UnitGame, "sideA" | "sideB">[],
+): P[] {
+  const played = new Set(games.flatMap((g) => [...g.sideA, ...g.sideB]));
+  return pairs.filter((p) => p.paid || played.has(p.id));
+}

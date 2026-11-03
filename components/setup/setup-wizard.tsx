@@ -1,5 +1,6 @@
 "use client";
 
+import type { OpenPlayKind } from "@/lib/registration/open-play";
 import { useState, useTransition } from "react";
 import { startOpenPlay } from "@/app/actions";
 import { useSessionStore } from "@/components/session-provider";
@@ -28,6 +29,8 @@ export type OpenPlaySummary = {
   rank: string;
   /** The ticked ranks, lowest first. */
   levels: Level[];
+  /** Regular (guests by name) or Ranked (players with profiles). */
+  kind: OpenPlayKind;
 };
 
 /** Courts suggested for the picked pairs: shared by pairs per rank. */

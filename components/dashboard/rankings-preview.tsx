@@ -2,10 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { liveStandingGames } from "@/app/actions";
-import { LevelBadge } from "@/components/level-badge";
-import { Avatar } from "@/components/ui/avatar";
 import type { QueueState } from "@/lib/queue/schema";
-import { LEVELS } from "@/lib/ranking/levels";
+import { RankingList } from "./ranking-list";
 import {
   predictionStatus,
   standings,
@@ -13,11 +11,10 @@ import {
 } from "@/lib/ranking/standings";
 
 const REFRESH_MS = 20_000;
-const MEDALS = ["🥇", "🥈", "🥉"];
 
 /**
- * Under the courts: every pair ranked so far, best first. Shows once each
- * pair has played a game, so the order means something.
+ * The Rankings tab: every pair ranked so far, best first. The list shows
+ * once each pair has played a game, so the order means something.
  */
 export function RankingsPreview({
   openPlayId,
@@ -26,7 +23,7 @@ export function RankingsPreview({
 }: {
   openPlayId: string;
   session: QueueState;
-  /** The Courts tab is showing: refresh while it is. */
+  /** The Rankings tab is showing: refresh while it is. */
   active: boolean;
 }) {
   const [games, setGames] = useState<UnitGame[] | null>(null);
@@ -57,13 +54,26 @@ export function RankingsPreview({
     name,
     skill,
   }));
-  if (!games || !predictionStatus(units, games).ready) return null;
+  if (!games) {
+    return (
+      <p className="rounded-[2rem] bg-white/80 p-5 text-ink/50 ring-2 ring-white">
+        Loading rankings…
+      </p>
+    );
+  }
+  if (!predictionStatus(units, games).ready) {
+    return (
+      <p className="rounded-[2rem] border-2 border-dashed border-ink/15 bg-white/60 p-6 text-center text-ink/55">
+        🏆 Rankings show here once every pair has played a scored game.
+      </p>
+    );
+  }
   const rows = standings(units, games);
 
   return (
     <section
       aria-labelledby="preview-title"
-      className="mt-5 rounded-[2rem] bg-white/80 p-4 ring-2 ring-white backdrop-blur sm:p-5"
+      className="rounded-[2rem] bg-white/80 p-4 ring-2 ring-white backdrop-blur sm:p-5"
     >
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <h2 id="preview-title" className="font-display text-2xl font-bold">
@@ -73,34 +83,7 @@ export function RankingsPreview({
           Everyone has played · points per game
         </span>
       </div>
-      <ol className="-m-1 flex max-h-96 flex-col gap-1.5 overflow-y-auto p-1">
-        {rows.map((r) => (
-          <li
-            key={r.id}
-            className={`grid grid-cols-[2.5rem_1fr_auto] items-center gap-2 rounded-2xl px-3 py-2 ring-2 ${r.rank <= 3 ? "bg-amber-50 ring-amber-200" : "bg-white ring-ink/5"}`}
-          >
-            <span className="text-center font-display text-lg font-bold tabular-nums">
-              {MEDALS[r.rank - 1] ?? r.rank}
-            </span>
-            <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-              {r.name.split(" & ").map((person, i) => (
-                <span key={i} className="flex items-center gap-1.5">
-                  <Avatar name={person} size="sm" />
-                  <span className="font-bold">{person}</span>
-                </span>
-              ))}
-              <LevelBadge level={LEVELS[r.skill ?? 0] ?? LEVELS[0]} size="sm" />
-            </span>
-            <span className="text-right text-sm tabular-nums">
-              <span className="block font-bold">{r.rating.toFixed(2)}</span>
-              <span className="text-xs font-semibold text-ink/50">
-                {r.wins}–{r.losses} · {r.pointDiff > 0 ? "+" : ""}
-                {r.pointDiff}
-              </span>
-            </span>
-          </li>
-        ))}
-      </ol>
+      <RankingList rows={rows} />
     </section>
   );
 }

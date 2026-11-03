@@ -38,6 +38,8 @@ with nobody waiting stays `playing` with an open slot.
 
 1. Only a `playing` court can finish.
 2. Record teammates and opponents in `history`; bump `gamesPlayed`.
+   An optional `score` (`{ scoreA, scoreB }`, side A first) is kept on
+   the new match; older matches have none.
 3. Keep the current up-next group (first full group in the queue) locked.
 4. Shuffle the finishers, append them to the rest of the queue, and re-plan
    that part with `planQueue`.
@@ -142,7 +144,8 @@ games, minutes }` per court, sorted by court number. `playerStats(state,
 sort)` gives one row per player (present or left) with `games`, total
 `minutes`, `status`, and `played`: that player's finished games as
 `{ courtLabel, minutes, endedAt }`, newest first. `formatMinutes` (in
-`time.ts`) shows totals as `1h 12m`, `2h`, or `45m`.
+`time.ts`) shows totals as `1h 12m`, `2h`, or `45m`. `matchWinner(match)`
+gives `"a"`, `"b"`, or null (no score, or a tie).
 
 ## Registered players
 
@@ -150,3 +153,17 @@ sort)` gives one row per player (present or left) with `games`, total
 fresh id; `{ id, name }` keeps the registered player's database id, so
 queue ids and `players.id` match. The live `QueueState` is saved whole to
 `sessions.state` (see `data-model.md`), not localStorage.
+
+## Heads-ups and estimates (`heads-up.ts`, `forecast.ts`)
+
+- `unpaidOnCourtAlerts(state, unpaidIds)`: one alert per unpaid unit on a
+  running or paused court, keyed per game (`unpaid:{court}:{start}:{id}`)
+  so dismissing one game doesn't hide the next. `UNPAID_REMIND_MS` (10
+  min) is how long "Remind me later" hides it.
+- `startWarning(state, courtId, now)`: null when `endsAt − now` is at
+  least `averageGameMs`; otherwise `{ minutesLeft, gameMinutes, behind }`,
+  where `behind` names waiting units with fewer games than everyone on
+  that court.
+- `gamesLeft(state, now)`: each court counts its running or paused game,
+  then `floor((endsAt − freeAt) / averageGameMs)` more; `each` is games ×
+  `playersPerCourt` ÷ units, rounded down to a tenth.
