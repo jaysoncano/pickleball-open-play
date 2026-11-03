@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { LevelBadge } from "@/components/level-badge";
 import { Avatar } from "@/components/ui/avatar";
 import type { OpenPlay, PairUnit } from "@/lib/db/queries";
@@ -53,14 +54,17 @@ export function ResultsView({
   games,
   matches,
   backHref,
+  hostActions,
 }: {
   play: OpenPlay;
-  /** The pairs who joined (paid). */
+  /** The pairs who joined: everyone who played, plus paid pairs. */
   pairs: PairUnit[];
   games: UnitGame[];
   matches: RecordedMatch[];
   /** Hosts go back to My open plays; everyone else to the open plays. */
   backHref: string;
+  /** Hosts only: share the results, or reopen an accidental end. */
+  hostActions?: ReactNode;
 }) {
   const rows = finalStandings(
     pairs.map((p) => ({ id: p.id, name: p.name, skill: p.skill })),
@@ -73,12 +77,17 @@ export function ResultsView({
 
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-5 px-4 py-5 sm:py-8">
-      <Link
-        href={backHref}
-        className="self-start rounded-xl font-semibold text-ink/60 hover:text-fuchsia-600"
-      >
-        ← Back
-      </Link>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Link
+          href={backHref}
+          className="rounded-xl font-semibold text-ink/60 hover:text-fuchsia-600"
+        >
+          ← Back
+        </Link>
+        {hostActions && (
+          <div className="flex flex-wrap items-center gap-2">{hostActions}</div>
+        )}
+      </div>
 
       <header className="relative overflow-hidden rounded-[2rem] shadow-[0_24px_60px_-28px_rgba(36,28,71,0.55)] ring-2 ring-white">
         <div aria-hidden className="absolute inset-0">

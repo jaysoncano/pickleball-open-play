@@ -8,6 +8,7 @@ import {
   matchMinutes,
   matchSides,
   matchup,
+  matchWinner,
 } from "./history";
 import type { Match } from "./schema";
 
@@ -180,5 +181,46 @@ describe("playerStats", () => {
       zero,
     );
     expect(playerStats(s).map((r) => r.status)).toEqual(["ready", "ready"]);
+  });
+});
+
+describe("match scores", () => {
+  function session() {
+    return createSession(
+      {
+        startTime: "18:00",
+        endTime: "21:00",
+        courtCount: 1,
+        playersPerCourt: 2,
+      },
+      ["Ana", "Ben"],
+      0,
+      ids(),
+      zero,
+    );
+  }
+
+  it("keeps the final score on the match", () => {
+    const s = finishGame(
+      startGame(session(), "id3", 0),
+      "id3",
+      10 * MIN,
+      zero,
+      { scoreA: 11, scoreB: 7 },
+    );
+    expect(s.matches.at(-1)?.score).toEqual({ scoreA: 11, scoreB: 7 });
+  });
+
+  it("leaves the score out when none is given", () => {
+    const s = finishGame(startGame(session(), "id3", 0), "id3", MIN, zero);
+    expect(s.matches.at(-1)).not.toHaveProperty("score");
+  });
+
+  it("names the winning side", () => {
+    const g = game(["Ana", "Ben"], 10);
+    expect(matchWinner({ ...g, score: { scoreA: 11, scoreB: 7 } })).toBe("a");
+    expect(matchWinner({ ...g, score: { scoreA: 9, scoreB: 11 } })).toBe("b");
+    expect(matchWinner({ ...g, score: { scoreA: 5, scoreB: 5 } })).toBeNull();
+    expect(matchWinner(g)).toBeNull();
   });
 });

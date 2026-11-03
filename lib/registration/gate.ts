@@ -23,17 +23,13 @@ export type Arrival = {
 };
 
 /**
- * Why a pair can't join the queue yet, or null when it can: the host must
- * confirm its payment, and before the start both players must be checked
- * in. Once the open play is `live`, paid is enough.
+ * Why a pair can't join the queue yet, or null when it can: it must play
+ * this open play's ranks, and both players must be checked in. The host
+ * checking them in is the go-ahead; payment can come later (the dashboard
+ * warns when an unpaid pair is on court).
  */
-export function notReady(
-  pair: Arrival,
-  { live = false }: { live?: boolean } = {},
-): string | null {
-  if (!pair.paid) return "Not paid yet. Confirm the payment at the desk.";
+export function notReady(pair: Arrival): string | null {
   if (pair.blocked) return pair.blocked;
-  if (live) return null;
   const away = pair.members.filter((m) => !m.checkedIn).map((m) => m.name);
   return away.length ? `Check in ${away.join(" & ")} first` : null;
 }

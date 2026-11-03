@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { createSession, extendSession, pauseGame, startGame } from "./engine";
-import { averageGameMs, DEFAULT_GAME_MS, forecast } from "./forecast";
+import {
+  averageGameMs,
+  DEFAULT_GAME_MS,
+  forecast,
+  gamesLeft,
+} from "./forecast";
 import type { Match, SessionConfig } from "./schema";
 
 const MIN = 60_000;
@@ -79,5 +84,32 @@ describe("forecast", () => {
 
   it("stops warning once the session is over", () => {
     expect(forecast(session(20), NOW + 2 * 60 * MIN).atRisk).toEqual([]);
+  });
+});
+
+describe("gamesLeft", () => {
+  it("fits average games on each court until the end", () => {
+    // One court, 60 minutes, 15-minute games: 4 more, 2 each for 8 players.
+    expect(gamesLeft(session(8), NOW)).toEqual({ games: 4, each: 2 });
+  });
+
+  it("counts the game on court, then what fits after it", () => {
+    const playing = startGame(session(8), "id9", NOW);
+    expect(gamesLeft(playing, NOW + 5 * MIN)).toEqual({ games: 4, each: 2 });
+    const paused = pauseGame(playing, "id9", NOW + 6 * MIN);
+    expect(gamesLeft(paused, NOW + 6 * MIN)).toEqual({ games: 4, each: 2 });
+  });
+
+  it("rounds each player's share down to a tenth", () => {
+    // 4 games × 4 seats over 12 players: 1.33… → 1.3.
+    expect(gamesLeft(session(12), NOW).each).toBe(1.3);
+  });
+
+  it("is zero once time is up or with no one playing", () => {
+    expect(gamesLeft(session(8), NOW + 2 * 60 * MIN)).toEqual({
+      games: 0,
+      each: 0,
+    });
+    expect(gamesLeft({ ...session(8), players: {} }, NOW).each).toBe(0);
   });
 });

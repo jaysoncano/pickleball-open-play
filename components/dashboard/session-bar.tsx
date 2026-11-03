@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { ShareLink } from "@/components/open-plays/share-link";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import type { QueueState } from "@/lib/queue/schema";
 import {
@@ -13,11 +14,14 @@ const timeLabel = new Intl.DateTimeFormat(undefined, {
 });
 
 export function SessionBar({
+  openPlayId,
   session,
   now,
   onEditTime,
   onEnd,
 }: {
+  /** For the public watch link players can follow. */
+  openPlayId: string;
   session: QueueState;
   now: number;
   onEditTime: () => void;
@@ -54,12 +58,13 @@ export function SessionBar({
           <span aria-hidden>🏓</span> Open play
         </h1>
         <div className="flex flex-wrap items-center gap-2">
+          <ShareLink openPlayId={openPlayId} />
           <Button variant="secondary" onClick={onEditTime}>
             <span aria-hidden>⚙️</span> Settings
           </Button>
           <ConfirmButton
             label="End session"
-            warning="The open play closes and shows its results: the top pairs, everyone ranked, and every game. It can't be started again."
+            warning="The open play closes and shows its results: the top pairs, everyone ranked, and every game. Ended it by mistake? Tap ↩ Reopen session on the results."
             confirmText="End session"
             onConfirm={onEnd}
             className="min-h-11 px-4 text-ink/60 hover:bg-rose-50 hover:text-rose-600"

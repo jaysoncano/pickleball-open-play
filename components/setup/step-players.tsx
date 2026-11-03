@@ -7,8 +7,8 @@ import type { PairUnit } from "@/lib/db/queries";
 export type { PairUnit };
 
 /**
- * Check players in as they arrive, then add the ready pairs (paid, both
- * players checked in). Unpaid pairs pay and get confirmed at the desk.
+ * Check players in as they arrive, then add the ready pairs (both players
+ * checked in, right rank). Unpaid pairs can play and pay later.
  */
 export function StepPlayers({
   openPlayId,

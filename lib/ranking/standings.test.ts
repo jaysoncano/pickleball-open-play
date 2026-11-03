@@ -4,6 +4,7 @@ import {
   gamePoints,
   POINTS,
   predictionStatus,
+  resultPairs,
   standings,
   topStandings,
   type StandingUnit,
@@ -205,5 +206,22 @@ describe("finalStandings", () => {
     expect(
       finalStandings([unit("b"), unit("a")], []).map((r) => r.rank),
     ).toEqual([1, 1]);
+  });
+});
+
+describe("resultPairs", () => {
+  it("keeps pairs who played (paid or not) and paid pairs who didn't", () => {
+    const pairs = [
+      { id: "paid-played", paid: true },
+      { id: "late-payer", paid: false },
+      { id: "paid-benched", paid: true },
+      { id: "no-show", paid: false },
+    ];
+    const games = [{ sideA: ["paid-played"], sideB: ["late-payer"] }];
+    expect(resultPairs(pairs, games).map((p) => p.id)).toEqual([
+      "paid-played",
+      "late-payer",
+      "paid-benched",
+    ]);
   });
 });

@@ -9,6 +9,7 @@ import {
   historySummary,
   matchMinutes,
   matchSides,
+  matchWinner,
 } from "@/lib/queue/history";
 import type { Match } from "@/lib/queue/schema";
 import { formatMinutes } from "@/lib/queue/time";
@@ -46,8 +47,8 @@ export function MatchHistory({ matches }: { matches: Match[] }) {
 
       {matches.length === 0 ? (
         <p className="rounded-3xl border-2 border-dashed border-ink/15 p-5 text-center text-ink/50">
-          Finished games show up here: court, minutes played, and who played
-          who. 🏆
+          Finished games show up here: court, minutes played, the score, and who
+          won. 🏆
         </p>
       ) : (
         <ol className="flex flex-col gap-2">
@@ -101,10 +102,17 @@ function CourtTotals({ matches }: { matches: Match[] }) {
 function MatchRow({ match }: { match: Match }) {
   const theme = courtTheme(courtNumber(match.courtLabel) - 1);
   const [sideA, sideB] = matchSides(match);
+  const winner = matchWinner(match);
+  const score = match.score;
 
   return (
     <li
-      className={`animate-pop-in flex flex-col gap-2 rounded-3xl p-3 ring-2 motion-reduce:animate-none ${theme.card}`}
+      aria-label={
+        score
+          ? `${match.courtLabel}: ${sideA.join(" & ")} ${score.scoreA}, ${sideB.join(" & ")} ${score.scoreB}`
+          : undefined
+      }
+      className={`animate-pop-in flex flex-col gap-3 rounded-3xl p-3 ring-2 motion-reduce:animate-none sm:p-4 ${theme.card}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span
@@ -122,37 +130,123 @@ function MatchRow({ match }: { match: Match }) {
           </span>
         </span>
       </div>
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-        <Side names={sideA} />
-        <span className="rounded-full bg-ink px-2 py-0.5 font-display text-xs font-bold tracking-wider text-white">
-          VS
+      {/* Phones: side A over side B. From sm up: side by side. */}
+      <div className="grid gap-2 pt-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-stretch sm:gap-3">
+        <Side
+          names={sideA}
+          points={score?.scoreA}
+          result={result(winner, "a")}
+        />
+        <span
+          aria-hidden
+          className="flex items-center justify-center gap-2 sm:flex-col"
+        >
+          <span className="h-0.5 flex-1 rounded-full bg-white sm:h-auto sm:w-0.5" />
+          <span className="rounded-full bg-ink px-2.5 py-0.5 font-display text-xs font-black tracking-wider text-white">
+            VS
+          </span>
+          <span className="h-0.5 flex-1 rounded-full bg-white sm:h-auto sm:w-0.5" />
         </span>
-        <Side names={sideB} alignEnd />
+        <Side
+          names={sideB}
+          points={score?.scoreB}
+          result={result(winner, "b")}
+          alignEnd
+        />
       </div>
     </li>
   );
 }
 
+type Result = "win" | "loss" | null;
+
+/** A side's result: null when the game has no score. */
+function result(winner: "a" | "b" | null, side: "a" | "b"): Result {
+  if (!winner) return null;
+  return winner === side ? "win" : "loss";
+}
+
+const PANEL: Record<"win" | "loss" | "none", string> = {
+  win: "bg-white ring-amber-300 shadow-[0_10px_25px_-12px_rgba(180,83,9,0.55)]",
+  loss: "bg-white/45 ring-ink/5",
+  none: "bg-white/80 ring-white",
+};
+
+/**
+ * One side as a scoreboard panel: players and their points. The winner
+ * gets a gold sticker slapped on its corner; the loser a faded stamp.
+ */
 function Side({
   names,
+  points,
+  result,
   alignEnd = false,
 }: {
   names: string[];
+  points?: number;
+  result: Result;
   alignEnd?: boolean;
 }) {
+  const win = result === "win";
+  const loss = result === "loss";
   return (
-    <ul
-      className={`flex min-w-0 flex-col gap-1 ${alignEnd ? "items-end" : "items-start"}`}
+    <div
+      className={`relative flex min-h-20 items-center gap-3 rounded-2xl p-3 ring-2 ${PANEL[result ?? "none"]} ${alignEnd ? "sm:flex-row-reverse" : ""}`}
     >
-      {names.map((name) => (
-        <li
-          key={name}
-          className={`flex max-w-full min-w-0 items-center gap-1.5 ${alignEnd ? "flex-row-reverse" : ""}`}
+      {win && <WinSticker alignEnd={alignEnd} />}
+      {loss && <LostStamp alignEnd={alignEnd} />}
+
+      <ul
+        className={`flex min-w-0 flex-1 flex-col gap-1.5 ${alignEnd ? "sm:items-end" : ""} ${loss ? "opacity-55 grayscale" : ""}`}
+      >
+        {names.map((name) => (
+          <li
+            key={name}
+            className={`flex max-w-full min-w-0 items-center gap-2 ${alignEnd ? "sm:flex-row-reverse" : ""}`}
+          >
+            <Avatar name={name} size="sm" />
+            <span
+              className={`truncate font-display text-base ${win ? "font-bold text-ink" : "font-semibold text-ink/80"}`}
+              title={name}
+            >
+              {name}
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      {points !== undefined && (
+        <span
+          className={`shrink-0 font-display text-4xl leading-none font-black tabular-nums ${win ? "text-emerald-600" : "text-ink/25"}`}
         >
-          <Avatar name={name} size="sm" />
-          <span className="truncate text-sm font-bold">{name}</span>
-        </li>
-      ))}
-    </ul>
+          {points}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** Die-cut gold sticker: white border, drop shadow, a little tilted. */
+function WinSticker({ alignEnd }: { alignEnd: boolean }) {
+  return (
+    <span
+      className={`animate-sticker absolute -top-3.5 z-10 inline-flex items-center gap-1 rounded-xl bg-gradient-to-br from-yellow-300 via-amber-300 to-amber-500 px-2.5 py-1 font-display text-sm font-black tracking-wide text-amber-950 uppercase shadow-[0_6px_14px_-4px_rgba(120,53,15,0.55)] ring-[3px] ring-white motion-reduce:animate-none ${alignEnd ? "right-3 rotate-6 sm:right-auto sm:left-3 sm:-rotate-6" : "right-3 rotate-6"}`}
+    >
+      <span aria-hidden className="text-base">
+        🏆
+      </span>
+      Winner
+    </span>
+  );
+}
+
+/** Rubber stamp: outlined, faded ink, tilted the other way. */
+function LostStamp({ alignEnd }: { alignEnd: boolean }) {
+  return (
+    <span
+      className={`animate-sticker absolute -top-3 z-10 rounded-lg border-[3px] border-double border-rose-400/80 bg-white/90 px-2 py-0.5 font-display text-xs font-black tracking-[0.25em] text-rose-500/85 uppercase motion-reduce:animate-none ${alignEnd ? "right-3 -rotate-6 sm:right-auto sm:left-3 sm:rotate-6" : "right-3 -rotate-6"}`}
+    >
+      Lost
+    </span>
   );
 }

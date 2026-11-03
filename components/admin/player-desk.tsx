@@ -195,7 +195,6 @@ export function DeskWorkspace({
     };
   }, [play.id, version]);
 
-  const collected = day?.pairs.reduce((n, p) => n + p.amountCents, 0) ?? 0;
   const left = spotsLeft(play.maxPairs, day?.pairs.length ?? play.pairCount);
 
   return (
@@ -215,8 +214,7 @@ export function DeskWorkspace({
           </span>
         </h1>
         <p className="font-display text-sm font-bold tabular-nums text-ink/70">
-          {day?.pairs.length ?? 0} paid · {day?.pending.length ?? 0} unpaid ·{" "}
-          {formatMoney(collected, currency)}
+          {day?.pairs.length ?? 0} paid · {day?.pending.length ?? 0} unpaid
           {left !== null && ` · ${left} spots left`}
         </p>
         {play.feeCents === 0 && (
@@ -372,7 +370,10 @@ function PlayerDirectory({
               >
                 <Avatar name={p.name} src={p.photo} size="sm" />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-bold">
+                  <span
+                    className="block truncate text-sm font-bold"
+                    title={p.name}
+                  >
                     {p.name}
                   </span>
                   <span className="flex flex-wrap items-center gap-1 text-[11px] font-semibold text-ink/50">

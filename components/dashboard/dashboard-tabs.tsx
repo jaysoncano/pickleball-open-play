@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, type KeyboardEvent } from "react";
+import { TAB, TAB_BAR, TAB_EMOJI, TAB_OFF, TAB_ON } from "@/components/ui/tabs";
 
 export type DashboardTab<Id extends string> = {
   id: Id;
@@ -19,8 +20,9 @@ export function tabPanelProps(id: string) {
 }
 
 /**
- * Sticky tab bar. Switching tabs while scrolled down jumps back to the
- * top of the content, so the new tab starts at its beginning.
+ * Sticky tab bar. On phones it scrolls sideways when the tabs don't fit,
+ * keeping the active one in view. Switching tabs while scrolled down jumps
+ * back to the top of the content, so the new tab starts at its beginning.
  */
 export function DashboardTabs<Id extends string>({
   tabs,
@@ -35,6 +37,9 @@ export function DashboardTabs<Id extends string>({
 
   function select(id: Id) {
     onChange(id);
+    document
+      .getElementById(`tab-${id}`)
+      ?.scrollIntoView({ inline: "nearest", block: "nearest" });
     const el = bar.current;
     if (el && el.getBoundingClientRect().top <= 16) {
       const top = el.offsetTop - 8;
@@ -63,7 +68,7 @@ export function DashboardTabs<Id extends string>({
         role="tablist"
         aria-label="Dashboard sections"
         onKeyDown={onKeyDown}
-        className="flex gap-1.5 rounded-[1.75rem] bg-white/85 p-1.5 shadow-[0_10px_30px_-15px_rgba(36,28,71,0.4)] ring-2 ring-white backdrop-blur-md"
+        className={TAB_BAR}
       >
         {tabs.map((tab) => {
           const selected = tab.id === active;
@@ -77,15 +82,15 @@ export function DashboardTabs<Id extends string>({
               aria-controls={`panel-${tab.id}`}
               tabIndex={selected ? 0 : -1}
               onClick={() => select(tab.id)}
-              className={`flex min-h-12 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-3xl px-1 font-display text-base font-semibold sm:gap-2 sm:text-lg transition-all focus-visible:outline-4 focus-visible:outline-sky-400 ${selected ? "bg-fuchsia-500 text-white shadow-[0_4px_0_0_#a21caf]" : "text-ink/60 hover:bg-fuchsia-50 hover:text-fuchsia-600"}`}
+              className={`${TAB} ${selected ? TAB_ON : TAB_OFF}`}
             >
-              <span aria-hidden className="max-sm:hidden">
+              <span aria-hidden className={TAB_EMOJI}>
                 {tab.emoji}
               </span>
               {tab.label}
               {tab.badge !== undefined && (
                 <span
-                  className={`min-w-6 rounded-full px-1.5 text-sm tabular-nums ${selected ? "bg-white/25" : "bg-ink/5"}`}
+                  className={`absolute top-1 right-1 min-w-5 rounded-full px-1 text-[10px] leading-5 tabular-nums md:static md:min-w-6 md:px-1.5 md:text-sm md:leading-normal ${tab.badge === 0 ? "max-md:hidden" : ""} ${selected ? "bg-white/25" : "bg-fuchsia-100 text-fuchsia-700 md:bg-ink/5 md:text-inherit"}`}
                 >
                   {tab.badge}
                 </span>

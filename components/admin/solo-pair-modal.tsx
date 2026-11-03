@@ -105,7 +105,10 @@ export function SoloPairModal({
                         src={photoUrl(s.playerId, s.photoUpdatedAt)}
                         size="sm"
                       />
-                      <span className="min-w-0 flex-1 truncate font-bold">
+                      <span
+                        className="min-w-0 flex-1 truncate font-bold"
+                        title={s.name}
+                      >
                         {s.name}
                       </span>
                       <LevelBadge level={s.level} size="sm" />

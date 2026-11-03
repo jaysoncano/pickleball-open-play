@@ -44,6 +44,7 @@ export function Avatar({
       <img
         src={src}
         alt=""
+        title={name}
         className={`inline-block shrink-0 rounded-full object-cover ring-2 ring-white ${sizes[size]} ${className}`}
       />
     );
@@ -51,6 +52,7 @@ export function Avatar({
   return (
     <span
       aria-hidden
+      title={name}
       className={`inline-flex shrink-0 items-center justify-center rounded-full font-display font-bold ring-2 ring-white ${palette[hash(name) % palette.length]} ${sizes[size]} ${className}`}
     >
       {initials(name)}

@@ -508,7 +508,7 @@ function RegularMarkPaid({
 }
 
 /** Regular pairs: they didn't pay after all. */
-function MarkUnpaid({
+export function MarkUnpaid({
   pairId,
   names,
   onSaved,

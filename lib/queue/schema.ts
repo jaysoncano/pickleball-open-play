@@ -81,6 +81,10 @@ export const MatchSchema = z.object({
   playerNames: z.array(z.string()),
   startedAt: z.number(),
   endedAt: z.number(),
+  /** The final score, side A then side B. Older games have none. */
+  score: z
+    .object({ scoreA: z.int().nonnegative(), scoreB: z.int().nonnegative() })
+    .optional(),
 });
 
 /** How often each pair of players has met, keyed by `pairKey(a, b)`. */

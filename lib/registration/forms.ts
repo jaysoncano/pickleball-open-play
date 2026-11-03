@@ -287,6 +287,11 @@ export function formatMoney(cents: number, currency: string): string {
   }
 }
 
+/** What unpaid pairs still owe: the entry fee for each one. */
+export function amountDue(unpaidPairs: number, feeCents: number): number {
+  return Math.max(0, unpaidPairs) * Math.max(0, feeCents);
+}
+
 /** Default fee in minor units from `OPEN_PLAY_FEE` (major units, e.g. 150). */
 export function feeCents(raw: string | undefined): number {
   const n = Number(raw);

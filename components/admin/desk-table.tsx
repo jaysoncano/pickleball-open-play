@@ -384,7 +384,13 @@ function Payment({ row, fee }: { row: DeskRow; fee: Fee }) {
 }
 
 /** `checkIn`: show check-in status (only before the start). */
-function People({ members, checkIn }: { members: Member[]; checkIn: boolean }) {
+export function People({
+  members,
+  checkIn,
+}: {
+  members: Member[];
+  checkIn: boolean;
+}) {
   return (
     <div className="flex items-center gap-2">
       <span className="flex shrink-0 -space-x-2">
@@ -398,7 +404,10 @@ function People({ members, checkIn }: { members: Member[]; checkIn: boolean }) {
         ))}
       </span>
       <span className="min-w-0">
-        <span className="block truncate font-bold">
+        <span
+          className="block truncate font-bold"
+          title={pairName(members.map((m) => m.name))}
+        >
           {pairName(members.map((m) => m.name))}
         </span>
         <span className="flex flex-wrap items-center gap-1">

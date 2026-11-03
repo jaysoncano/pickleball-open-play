@@ -1,5 +1,6 @@
 import type { DayMember, DayPair, PendingPair } from "@/lib/db/queries";
 import { nameKey } from "@/lib/queue/names";
+import { amountDue } from "./forms";
 
 /** One line of the desk's table: a pair (paid or not) or a solo player. */
 export type DeskRow =
@@ -81,6 +82,37 @@ export function filterRows(
             nameKey(m.name).includes(key) || nameKey(m.fullName).includes(key),
         )),
   );
+}
+
+/** Money for one open play: what paid pairs paid, what unpaid ones owe. */
+export type PaymentTotals = {
+  paidCents: number;
+  paidCount: number;
+  unpaidCents: number;
+  unpaidCount: number;
+  /** Paid plus unpaid: what the open play makes once everyone pays. */
+  totalCents: number;
+  totalCount: number;
+};
+
+/**
+ * The Payments tab's widgets: paid is the sum of what each pair actually
+ * paid; unpaid is the entry fee for each pair that hasn't paid yet.
+ */
+export function paymentTotals(
+  day: { pairs: Pick<DayPair, "amountCents">[]; pending: unknown[] },
+  feeCents: number,
+): PaymentTotals {
+  const paidCents = day.pairs.reduce((n, p) => n + p.amountCents, 0);
+  const unpaidCents = amountDue(day.pending.length, feeCents);
+  return {
+    paidCents,
+    paidCount: day.pairs.length,
+    unpaidCents,
+    unpaidCount: day.pending.length,
+    totalCents: paidCents + unpaidCents,
+    totalCount: day.pairs.length + day.pending.length,
+  };
 }
 
 /** "Ana Maria Cruz" → first "Ana Maria", last "Cruz"; one word is a first name. */

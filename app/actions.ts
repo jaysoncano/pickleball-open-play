@@ -601,7 +601,7 @@ export async function checkInPair(
 }
 
 /**
- * Start an open play with its paid pairs. Pairs are the queue's units, two
+ * Start an open play with its checked-in pairs. Pairs are the queue's units, two
  * per court (pair vs pair); the date and times come from the open play.
  */
 export async function startOpenPlay(
@@ -632,7 +632,7 @@ export async function startOpenPlay(
   if (unregistered) {
     return { error: "Some pairs aren't signed up for this open play. Reload." };
   }
-  // Only paid pairs with both players checked in can start.
+  // Only checked-in pairs at the right rank can start; they may pay later.
   for (const p of players) {
     const why = notReady(p);
     if (why) return { error: `${p.name}: ${why}` };
@@ -655,12 +655,12 @@ export async function startOpenPlay(
   return { state };
 }
 
-/** Late arrivals: only paid, checked-in pairs that can play its ranks. */
+/** Late arrivals: checked-in pairs that can play its ranks, paid or not. */
 export async function addLateArrivals(openPlayId: string, pairIds: string[]) {
   return (
     pickRegistered(await rosterFor(openPlayId), pairIds)
-      // Running already: no check-in needed, paid is enough.
-      .players.filter((p) => !notReady(p, { live: true }))
+      // Checked in at the right rank; they may pay later.
+      .players.filter((p) => !notReady(p))
       .map(asUnit)
   );
 }
@@ -700,6 +700,18 @@ export async function endOpenPlay(openPlayId: string): Promise<void> {
   await requireOpenPlay(openPlayId);
   await q.endSession(getDb(), openPlayId);
   revalidatePath("/", "layout");
+}
+
+/** Undo an accidental "End session": it runs again as it was. */
+export async function reopenOpenPlay(
+  openPlayId: string,
+): Promise<string | null> {
+  await requireOpenPlay(openPlayId);
+  if (!(await q.reopenSession(getDb(), openPlayId))) {
+    return "Couldn't reopen: it's already running, or it never started.";
+  }
+  revalidatePath("/", "layout");
+  return null;
 }
 
 /** Record a finished game's score and save the session after it. */
@@ -1045,7 +1057,8 @@ export async function playerQrCode(
   // Hosts get QR codes only for players in their own open plays.
   if (!(await staffFor(await requireStaff(), playerId))) return null;
   const secret = await q.getPlayerPrivate(getDb(), playerId);
-  if (!secret) return null;
+  // Regular open plays' guests have no profile: no QR code.
+  if (!secret || secret.guest) return null;
   const url = claimUrl(originFrom(await headers()), secret.claimToken);
   return { svg: await qrSvg(url), url };
 }

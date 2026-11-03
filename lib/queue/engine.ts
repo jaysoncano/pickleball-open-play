@@ -20,6 +20,7 @@ import {
   OVERTIME_RANGE,
   PlayerNameSchema,
   type Court,
+  type Match,
   type Player,
   type QueueState,
   type SessionSetup,
@@ -358,6 +359,8 @@ export function finishGame(
   courtId: string,
   now: number,
   rng: Rng = Math.random,
+  /** The final score, kept on the match for the history. */
+  score?: Match["score"],
 ): QueueState {
   const court = findCourt(state, courtId);
   if (!court || court.playerIds.length === 0) return state;
@@ -384,6 +387,7 @@ export function finishGame(
       playerNames: court.playerIds.map((pid) => players[pid].name),
       startedAt,
       endedAt: now,
+      ...(score && { score }),
     },
   ].slice(-MATCH_HISTORY_LIMIT);
 

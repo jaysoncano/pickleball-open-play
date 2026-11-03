@@ -6,6 +6,14 @@ export function matchSides(match: Match): [string[], string[]] {
   return [match.playerNames.slice(0, half), match.playerNames.slice(half)];
 }
 
+/** Which side won ("a" or "b"), or null with no score or a tie. */
+export function matchWinner(match: Match): "a" | "b" | null {
+  if (!match.score) return null;
+  const { scoreA, scoreB } = match.score;
+  if (scoreA === scoreB) return null;
+  return scoreA > scoreB ? "a" : "b";
+}
+
 /** Whole minutes played, never shown as zero. */
 export function matchMinutes(match: Match): number {
   return Math.max(1, Math.round((match.endedAt - match.startedAt) / 60_000));

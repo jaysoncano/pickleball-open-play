@@ -149,8 +149,8 @@ afterwards. The Manage page, desk, and results show which it is.
 | Email          | None                                                                                    | Required: receipts and profile link                                                  |
 | Online sign-up | No: the public page says to join at the booth                                           | Yes                                                                                  |
 | Paid / unpaid  | A **Paid** box when adding; **✓ Mark paid** (entry fee, cash) and **Mark unpaid** later | **✓ Mark paid** with amount, method, notes                                           |
-| Queue          | Paid pairs only                                                                         | Paid pairs only                                                                      |
-| Check-in       | Same as Ranked                                                                          | Before the start only                                                                |
+| Queue          | Checked-in pairs (they may pay later)                                                   | Checked-in pairs (they may pay later)                                                |
+| Check-in       | Same as Ranked                                                                          | Before and after the start: checking in queues the pair                              |
 | Stats          | Kept for that open play (History, Standings, results); nothing on player profiles       | Saved to each player's record, shared across open plays (levels, protests, rankings) |
 
 - Regular desk form has two tabs: **👥 Pair** (`gel/son`, **Paid
@@ -182,11 +182,44 @@ afterwards. The Manage page, desk, and results show which it is.
   into a name already there tells the host ("Gel is already in this open
   play"). Another open play, or a real player, can use the same name.
 
+## Public board (watch live)
+
+- `/open-plays/[id]?view=courts`, for **Regular and Ranked** open plays,
+  is a read-only board for players and anyone watching. It refreshes
+  every 15 s. Hosts open the same link too, to see what players see.
+- Top: the session time, then the stats row (players, on court, waiting,
+  courts, games). Tabs (`?tab=`): **🎾 Courts** (the host dashboard's
+  court view, watch only: the same court cards with live game clocks,
+  status, each court's rank and each pair's rank badge, a **Ranks playing
+  now** strip, the Up next card, and the queue with ranks, games, and
+  waits; no buttons: no start, swap, remove, reorder, or rename),
+  **📊 Rankings** (rankings so far,
+  once every pair has a scored game), **🔢 Games played** (games and
+  minutes per pair, sortable), **🏆 History** (every game with its score
+  the Winner sticker, and the Lost stamp).
+- **Nothing private:** no payments or fees owed, notes, check-in status,
+  emails, phones, or QR codes. Ranked players' names link to their
+  profiles; Regular guests are names only (they have no profile).
+- Before the start the link shows the open play's page; after the end,
+  its results.
+- **Share:** hosts get a **🔗 Share** button on the live dashboard, the
+  Manage page, and the results. Tapping it copies the watch link and
+  pops up a notification (bottom right, closes after 8 s or with ×):
+  "Link copied! Paste it in a chat or group, or share it", the link
+  itself, **📤 Share…** (the phone's share sheet, where there is one), and
+  **Open ↗**. If copying isn't allowed, it says "Copy this link" with
+  the link selected on tap.
+- Join copy on the public page: check in at the booth to get in the
+  queue; pay the entry at the booth, now or later.
+
 ## End of an open play
 
-- **End session** asks in a popup. Confirming closes the open play for
-  good: its page shows the **results** instead of setting it up again,
-  for hosts (from My open plays) and the public alike:
+- **End session** asks in a popup. Confirming closes the open play: its
+  page shows the **results** instead of setting it up again, for hosts
+  (from My open plays) and the public alike. **Ended by mistake?** Its
+  hosts see **↩ Reopen session** on the results (asks first): the open
+  play goes live again with its courts, queue, and games as they were
+  (add time in Settings if it's past the end). The results show:
   - **Top pairs** (🥇🥈🥉),
   - **Rankings**: every pair that joined, highest to lowest by the
     Standings point system; pairs that never played are last,
@@ -289,7 +322,8 @@ afterwards. The Manage page, desk, and results show which it is.
      its own. On phones a **Sign up | List** switch shows one at a time,
      the list shows cards instead of a table, and the filters scroll
      sideways. A bar on top shows paid and unpaid
-     counts, money collected, and spots left.
+     counts and spots left (no money totals: those live only on the
+     dashboard's **Payments** tab).
      - **Left, tabs:** **Pay later** (unpaid, first), **Paid now**, **Solo**,
        and **Players** (find anyone to edit or show their QR). Each player
        is picked from registered players or added as new (queue name,
@@ -334,17 +368,57 @@ afterwards. The Manage page, desk, and results show which it is.
 - Same live dashboard: courts, up next, queue, drag to reorder, swap,
   pause, overtime alerts, history tab. **Late arrivals**: pairs signed up
   for this open play who aren't in the queue show under it in **Not in
-  the queue yet** (refreshes every 20 s). It's running, so **no
-  check-in**: once a pair is paid, it **joins the queue on its own, at the
-  front** (it hasn't played yet, so games stay balanced). Unpaid pairs fold into one line ("⚠️ 2 unpaid pairs ·
-  Review & confirm") that opens a popup to **✓ Mark paid** each one. **＋ New pair** registers a pair right there (the desk's
-  form: Pay later, Paid now, Solo); they wait in that list until added.
+  the queue yet** (refreshes every 20 s), each with its check-in button.
+  Once the host **checks a pair in**, it **joins the queue on its own, at
+  the front** (it hasn't played yet, so games stay balanced), paid or
+  not: unpaid pairs show a **Pay later** chip and pay when they can (mark
+  them paid in **💰 Payments**). **＋ New pair** registers a pair right
+  there (the desk's form: Pay later, Paid now, Solo); they wait in that
+  list until checked in.
+- **Heads-ups** (top-right pop-ups, notifications only):
+  - **Unpaid pair playing:** while an unpaid pair is in a running or
+    paused game, "💸 {pair} hasn't paid · playing on Court N". **Remind me
+    in 10 min** brings it back later; **Dismiss** hides it for that game.
+    It clears on its own once they're marked paid.
+  - **Running long:** a game past the overtime limit (Snooze 5 min,
+    Dismiss).
+- **Start-game check:** tapping **▶ Start** when the time left is less
+  than a typical game here (the session's average, 15 min until games
+  finish) opens a popup first: "Only N min left" (or "Session time is
+  up"), the typical game length and end time, and, to keep games even,
+  the waiting pairs who've played fewer games than everyone on that
+  court. **Go back**, **⏱ Add time** (opens the session time), or
+  **▶ Start anyway**.
+- **Games left (est.)** tile in the stats row: games that still fit
+  before the end (each court finishes its game, then fits average-length
+  games) and about how many more that gives each pair ("≈ 1.5 more games
+  each").
 - **Courts** show side A over side B with a **VS** line between; each pair
   is a full-width row with both players' avatars and names in full.
-- **Rankings so far** appears under the courts once every pair has
-  played a game: every pair best first (🥇🥈🥉 highlighted), both
+- **Players** tab (👥, badge: pairs signed up): every pair who joined
+  this open play, not checked in first. **Search** by pair or player
+  name; filters with counts: **All**, **Not checked in**, **Checked in**,
+  **Pay later**, **Wrong rank**. Each row: both players, rank, Pay later
+  and Wrong rank chips, **where the pair is** (▶ Playing · Court 2,
+  Seated · Court 1, In line #3, or Not in queue), **games played**, and a
+  **○ Check in / ✓ Checked in** switch for the pair. Hosts check pairs in
+  here **even after the start**: a checked-in pair joins the queue at the
+  front right away, paid or not. Unchecking doesn't take a pair out of
+  the queue (remove it from the queue for that). Refreshes every 20 s
+  while open.
+- **Rankings** tab (📊): "Rankings so far" once every pair has played
+  a scored game (until then, a note saying so): every pair best first (🥇🥈🥉 highlighted), both
   players' names, rating, W–L, and point difference. It refreshes as
   scores come in.
+- **History** tab: each finished game shows its court, minutes, times,
+  and the two sides as scoreboard panels, each with its players and
+  points. The winner gets a gold **🏆 Winner** sticker slapped on its
+  corner (white die-cut border, tilt, a slap-on animation; none with
+  reduced motion) and green points; the loser a faded, tilted **Lost**
+  rubber stamp with greyed players. Phones stack the sides with VS
+  between; wider screens put them side by side. Games from before
+  scores were kept show the sides with **VS** and no stickers. The score is kept on the
+  session's match (`Match.score`) as well as in the `matches` table.
 - **Game done** asks the host for the **final score** (no ties), typed
   in for each pair. Scores are entered by hand, only by the open play's
   hosts (creator, co-hosts) or an admin; players and the public board
@@ -360,6 +434,16 @@ afterwards. The Manage page, desk, and results show which it is.
   the leader as the predicted winner. The host picks Top 3, 5 or 10 and
   one rank or all ranks. It refreshes when a game is scored and every
   20 s.
+- **Payments** tab (hosts only, badge: unpaid pairs): three widgets,
+  **Total amount** (paid + unpaid, with a "% collected" bar), **Total
+  paid** (what paid pairs actually paid) and **Total unpaid** (entry fee
+  × unpaid pairs), then two tables side by side (stacked on
+  phones): **Paid** and **Unpaid**. Each row shows the pair, the amount
+  (paid: amount, method, time; unpaid: the fee and sign-up time), notes,
+  and actions: **✓ Mark paid** (unpaid), **Mark unpaid** (paid, Regular
+  only), and **📝 Notes**, which opens the pair popup (notes, names,
+  remove or reject). It's the only page that shows money totals and
+  refreshes every 20 s while open.
 - Pair names come from the players ("Ana & Ben"); rename players at the
   desk, not in the queue.
 - Changes save in the background; a red banner shows if a save fails.
@@ -390,6 +474,11 @@ link to profiles.
 
 - Every player has a QR code. Admins see it on the profile and print all
   of them from `/admin/qr-codes`. "New code" voids a printed one.
+- **Regular open plays have no QR codes or Profiles tab.** Their guests
+  are names only (no email, no profile), so the dashboard hides the
+  📱 Profiles tab, the Player desk has no player list or QR buttons, and
+  the server refuses a guest's QR code (`playerQrCode`) and claim link
+  (`playerByClaimToken`).
 - Scanning opens `/claim/<token>`: enter email → a 6-digit code is emailed
   (10 min, 5 tries, one per minute) → verified devices stay signed in for
   30 days and land on `/players/[id]/edit`.
@@ -462,12 +551,11 @@ person to verify an email through a code claims that profile.
 - **Check-in before queuing:** the first setup step is **Check-in**: every
   pair (paid and unpaid) with **one button for the pair** ("○ Son & Gel ·
   Check in"): one tap checks both players in, tapping again undoes both.
-  Before the start a pair can be added to the queue only when it's
-  **paid and checked in** ("✓ Ready"); the server refuses anything else.
-  Check-in applies only before the start: once the open play is running,
-  a paid pair can be added without it. Before the start the desk's list
-  shows "✓ Checked in" or "○ Not checked in" per pair; once it's running,
-  that status is hidden.
+  A pair can join the queue once it's **checked in** at the right rank
+  ("✓ Ready"), paid or not ("Pay later" chip); the server refuses
+  anything else. Checking in is the host's go-ahead, before and after the
+  start. Before the start the desk's list shows "✓ Checked in" or "○ Not
+  checked in" per pair; once it's running, that status is hidden.
 - **Players are shared across open plays and groups.** A player is one
   record identified by email: registering someone (desk or online) with
   an email already on a player links that player, keeping their name,

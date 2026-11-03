@@ -241,7 +241,9 @@ function Person({ m, onHold }: { m: Member; onHold: () => void }) {
         src={photoUrl(m.playerId, m.photoUpdatedAt)}
         size="sm"
       />
-      <span className="min-w-0 flex-1 truncate font-bold">{m.name}</span>
+      <span className="min-w-0 flex-1 truncate font-bold" title={m.name}>
+        {m.name}
+      </span>
       <HoldButton name={m.name} onClick={onHold} />
     </span>
   );

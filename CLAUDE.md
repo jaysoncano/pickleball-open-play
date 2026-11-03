@@ -32,7 +32,12 @@ Tailwind 4, Zod 4, Drizzle ORM on Supabase Postgres (local via
 - Pages: `/` (public: open plays coming up), `/host` (staff: My open
   plays, live / coming up / past; admins Mine or All), `/open-plays/new`
   (schedule one; saving opens its Manage page),
-  `/open-plays/[id]` (its hosts: setup/dashboard; others: public board),
+  `/open-plays/[id]` (its hosts: setup/dashboard; others: info page;
+  `?view=courts` is the shareable public board for everyone, hosts too:
+  tabs Courts (dashboard look, watch only: `PublicCourts` with
+  `CourtView`, `UpNextCard readOnly`, `QueueView`, ranks playing),
+  Rankings, Games played, History (`?tab=`), nothing private;
+  hosts share it with `ShareLink` on the dashboard, Manage, and results),
   `/open-plays/[id]/manage` (its hosts: edit date/ranks/cap/fee, venue,
   banner, hosts table; only the main host invites or creates a co-host
   account (`createCoHostAccount`); image at `/banners/[id]`;
@@ -50,7 +55,13 @@ Tailwind 4, Zod 4, Drizzle ORM on Supabase Postgres (local via
   creators can show the password they set: `start_password`, sealed with
   ADMIN_SECRET, cleared when the account changes it), `/login` (players).
   Host dashboard
-  tabs: Courts, Profiles (check-in QR), History, Standings.
+  tabs: Courts, Players (every signed-up pair: search, filters, where
+  they are, games, check in even after the start; `lib/registration/
+roster.ts`), Rankings (rankings so far), Profiles (profile-setup QR;
+  Ranked only: Regular guests have no profile or QR),
+  History (scoreboard panels, 🏆 Winner sticker / Lost stamp; `Match.score`), Standings, Payments
+  (total/paid/unpaid widgets + two tables; the only place money totals
+  show).
 - Docs: `docs/prd/pop.md`, `docs/specs/data-model.md`,
   `docs/specs/queue-engine.md`.
 
@@ -86,14 +97,18 @@ Tailwind 4, Zod 4, Drizzle ORM on Supabase Postgres (local via
   directory, profiles, rankings, and app-wide name uniqueness via
   `realNamed`; names are unique within one open play via `nameTakenIn`).
   Ranked: the email flow (`registrationProblem` refuses Regular).
-- Once live, paid pairs join the queue on their own, at the front
+- Once live, checked-in pairs join the queue on their own, at the front
   (`addLatePairs`). After **End session** the open play shows its
   results (`ResultsView`: top pairs, `finalStandings`, every game) and
-  can't be started again (`hasEndedSession`).
+  can't be set up again (`hasEndedSession`); its hosts can undo an
+  accidental end with **↩ Reopen session** (`reopenSession`).
 - Payments are confirmed by hosts by hand; unpaid pairs are `pending`.
-  A pair joins the queue only when `notReady` is null: paid, right rank,
-  and, before the start, both checked in (`{ live: true }` once running:
-  no check-in).
+  A pair joins the queue only when `notReady` is null: right rank and
+  both checked in (before and after the start). Checking in is the
+  host's go-ahead; payment can come later. The dashboard warns while an
+  unpaid pair plays (`unpaidOnCourtAlerts`, reminds every 10 min) and
+  before a game starts without time to finish (`startWarning`, popup);
+  the stats row estimates games left (`gamesLeft`).
 - Players are one record per email across open plays: registration
   links by email (`linkByEmail`), never duplicates.
 - Open play is by paid pairs: queue units are pair ids. Code that needs
@@ -111,7 +126,9 @@ Tailwind 4, Zod 4, Drizzle ORM on Supabase Postgres (local via
   `confirmLabel`). Creating or recording something new (a sign-up, a
   pairing, a game's score) saves in one tap with a plain `Button`. A
   dropdown or file pick that saves asks inline first. Live dashboard moves
-  (queue order, swaps, court rank, rename) stay one tap.
+  (queue order, swaps, court rank, rename) stay one tap. Every popup is
+  `Modal`: the whole card animates in and out (`dialog.modal` in
+  `app/globals.css`).
 
 ## Local email
 

@@ -118,7 +118,10 @@ export function PlayerStatsTable({ session }: { session: QueueState }) {
                       >
                         <Avatar name={row.name} size="sm" />
                         <span className="min-w-0">
-                          <span className="block max-w-32 truncate font-bold sm:max-w-48">
+                          <span
+                            className="block max-w-32 truncate font-bold sm:max-w-48"
+                            title={row.name}
+                          >
                             {row.name}
                           </span>
                           <span className="block text-xs font-semibold text-ink/45 sm:hidden">
